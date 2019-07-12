@@ -36,16 +36,16 @@ class RoleController
             'description' => 'nullable|string|max:255',
             'config' => 'nullable',
             'identifier' => 'nullable|array|min:1',
-            'roles' => 'required|array',
-            'permissions' => 'required|array'
+            'roles' => 'array',
+            'permissions' => 'array'
         ]);
 
         return \DB::transaction(function () {
             $data = \Request::only(['name', 'description', 'config']);
-            $data['child_length'] = count($roles = \Request::input('roles', []));
+            $data['children'] = count($roles = \Request::input('roles', []));
             $role = Role::create($data, \Request::input('identifier'));
 
-            if ($data['child_length']) {
+            if ($data['children']) {
                 $role->giveChildRoleTo($roles);
             }
 
@@ -63,19 +63,19 @@ class RoleController
             'name' => ['required', 'regex:/^[A-Za-z0-9\x{4e00}-\x{9fa5}]{2,16}$/u'],
             'description' => 'nullable|string|max:255',
             'config' => 'nullable',
-            'roles' => 'required|array',
-            'permissions' => 'required|array'
+            'roles' => 'array',
+            'permissions' => 'array'
         ]);
         $role = Role::findById(\Request::input('role_id'));
         if (!$role) throw new \Exception('role not found');
 
         return \DB::transaction(function () use ($role) {
             $data = \Request::only(['name', 'description', 'config']);
-            $data['child_length'] = count($roles = \Request::input('roles', []));
+            $data['children'] = count($roles = \Request::input('roles', []));
 
             $role->update($data);
 
-            if ($data['child_length']) {
+            if ($data['children']) {
                 $role->syncChildRoles($roles);
             }
 

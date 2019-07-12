@@ -23,21 +23,9 @@ class CreateRolesTable extends Migration
 
             $table->string('config', 512)->nullable();
             $table->string('description')->nullable();
-
-            if (config('permission.role.extend')) {
-                $table->integer('child_length')->default(0);
-            }
-
+            $table->integer('children')->default(0);
             $table->timestamps();
         });
-
-        if (config('permission.role.extend')) {
-            Schema::create('role_has_roles', function (Blueprint $table) {
-                $table->unsignedInteger('role_id');
-                $table->unsignedInteger('child_id');
-                $table->primary(['role_id', 'child_id']);
-            });
-        }
     }
 
     /**
@@ -48,8 +36,5 @@ class CreateRolesTable extends Migration
     public function down()
     {
         Schema::dropIfExists('roles');
-        if (config('permission.role.extend')) {
-            Schema::dropIfExists('role_has_roles');
-        }
     }
 }

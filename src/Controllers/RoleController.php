@@ -8,16 +8,34 @@
 
 namespace YiluTech\Permission\Controllers;
 
+use YiluTech\Permission\IdentityUtil;
 use YiluTech\Permission\Models\Role;
 
 class RoleController
 {
+    public function list()
+    {
+        $query = Role::query()->leftJoin('role_has_roles', 'role_has_roles.role_id', 'roles.id')
+            ->select('roles.*', \DB::raw('group_concat(child_id separator ",") as child_keys'))->groupBy('id');
+
+        if ($identifier = IdentityUtil::getIdentifier()) {
+            IdentityUtil::whereIdentity($query, $identifier, true, 'roles');
+        }
+
+        return $query->get()->each(function ($item) {
+            if ($item->child_keys) {
+                $item->child_keys = explode(',', $item->child_keys);
+            }
+        });
+    }
+
     public function create()
     {
         \Request::validate([
-            'name' => ['required', 'regex:' . sprintf(REGEX_EN_ZH_CN, '{2,16}')],
+            'name' => ['required', 'regex:/^[A-Za-z0-9\x{4e00}-\x{9fa5}]{2,16}$/u'],
             'description' => 'nullable|string|max:255',
             'config' => 'nullable',
+            'identifier' => 'nullable|array|min:1',
             'roles' => 'required|array',
             'permissions' => 'required|array'
         ]);
@@ -25,8 +43,7 @@ class RoleController
         return \DB::transaction(function () {
             $data = \Request::only(['name', 'description', 'config']);
             $data['child_length'] = count($roles = \Request::input('roles', []));
-
-            $role = Role::create($data, ['instance' => 1, 'shop' => 2]);
+            $role = Role::create($data, \Request::input('identifier'));
 
             if ($data['child_length']) {
                 $role->giveChildRoleTo($roles);
@@ -43,7 +60,7 @@ class RoleController
     {
         \Request::validate([
             'role_id' => 'required|integer',
-            'name' => ['required', 'regex:' . sprintf(REGEX_EN_ZH_CN, '{2,16}')],
+            'name' => ['required', 'regex:/^[A-Za-z0-9\x{4e00}-\x{9fa5}]{2,16}$/u'],
             'description' => 'nullable|string|max:255',
             'config' => 'nullable',
             'roles' => 'required|array',
@@ -51,7 +68,6 @@ class RoleController
         ]);
         $role = Role::findById(\Request::input('role_id'));
         if (!$role) throw new \Exception('role not found');
-
 
         return \DB::transaction(function () use ($role) {
             $data = \Request::only(['name', 'description', 'config']);
@@ -75,20 +91,3 @@ class RoleController
 
     }
 }
-
-/*
- *
- *     Route::group(['prefix' => 'permission'], function () {
-Route::post('create', 'PermissionController@create')->name('permission.create');
-Route::post('update', 'PermissionController@update')->name('permission.update');
-Route::post('delete', 'PermissionController@delete')->name('permission.delete');
-Route::post('translate', 'PermissionController@translate')->name('permission.translate');
-Route::post('removetranslation', 'PermissionController@removeTranslation')->name('permission.removetranslation');
-});
-
-Route::group(['prefix' => 'role'], function () {
-Route::post('create', 'RoleController@create')->name('role.create');
-Route::post('update', 'RoleController@update')->name('role.update');
-Route::post('delete', 'RoleController@delete')->name('role.delete');
-});
- */

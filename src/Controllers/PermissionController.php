@@ -10,58 +10,36 @@ namespace YiluTech\Permission\Controllers;
 
 use YiluTech\Permission\Models\Permission;
 use YiluTech\Permission\Models\PermissionTranslation;
+use YiluTech\Permission\Models\Role;
+use YiluTech\Permission\Util;
 
 class PermissionController
 {
     public function list()
     {
-    }
-
-    public function sync()
-    {
-        $uris = \MicroApi::get('gateway/routes')->query(['auth_type' => 'instance_admin'])->run()->getJson();
-
-        foreach ($uris as $item) {
-            $item['type'] = 'source';
-            if (empty($item['group'])) {
-                $item['group'] = null;
-                $items[] = array_only($item, ['name', 'type', 'extra', 'group', 'uri']);
-            } else {
-                foreach (explode(',', $item['group']) as $group) {
-                    $item['group'] = $group == 'default' ? null : $group;
-                    $items[] = array_only($item, ['name', 'type', 'extra', 'group', 'uri']);
-                }
-            }
+        if ($role_id = \Request::input('role_id')) {
+            $role = Role::findById($role_id);
+            $permissions = $role ? $role->permissions() : collect([]);
+        } else {
+            $permissions = Permission::query()->get();
         }
-
-        return \DB::transaction(function () use ($items) {
-            $origins = Permission::query()->where('type', 'source')->get();
-            foreach ($items as $item) {
-                $exists = false;
-                foreach ($origins as $key => $origin) {
-                    if ($origin->group === $item['group'] && $origin->name === $item['name']) {
-                        $exists = true;
-                        $origin->update($item);
-                        $origins->offsetUnset($key);
-                        break;
-                    }
-                }
-                if (!$exists) {
-                    Permission::create($item);
+        $translations = PermissionTranslation::query()->where('lang', app()->getLocale())->get();
+        $permissions->each(function ($item) use ($translations) {
+            foreach ($translations as $translation) {
+                if (Util::str_path_match($translation->name, $item->name)) {
+                    $item->translation = $translation->content;
+                    break;
                 }
             }
-            if ($origins->count()) {
-                Permission::query()->whereIn('id', $origins->pluck('id')->toArray())->delete();
-            }
-            return 'success';
         });
+        return $permissions;
     }
 
     public function create()
     {
         $attributes = \Request::input();
         \Validator::make($attributes, [
-            'name' => ['required', 'string', 'max:40', 'regex:/^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)?$/', 'unique:permissions,name'],
+            'name' => ['required', 'string', 'max:40', 'regex:/^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*$/', 'unique:permissions,name'],
             'type' => 'required|string|max:16',
             'group' => 'nullable|string|max:16',
             'context' => 'nullable|array'
@@ -75,7 +53,7 @@ class PermissionController
         if (!$permission) throw new \Exception('permission not exists');
         $attributes = \Request::input();
         \Validator::make($attributes, [
-            'name' => ['required', 'string', 'max:40', 'regex:/^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)?$/', 'unique:permissions,name' . $attributes['id']],
+            'name' => ['required', 'string', 'max:40', 'regex:/^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*$/', 'unique:permissions,name' . $attributes['id']],
             'type' => 'required|string|max:16',
             'group' => 'nullable|string|max:16',
             'context' => 'nullable|array'
@@ -96,9 +74,9 @@ class PermissionController
     {
         $attributes = \Request::input();
         \Validator::make($attributes, [
-            'name' => 'required|string|max:255|exists|permission:name',
-            'lang' => 'required|string|in:zh_cn,en',
-            'translation' => 'required|string|max:64',
+            'name' => ['required', 'string', 'max:40', 'regex:/^([a-zA-Z0-9]+|[*])(\.[a-zA-Z0-9]+)*$/'],
+            'lang' => 'required|string|in:zh_CN,en',
+            'content' => 'required|string|max:64',
             'description' => 'nullable|string|max:255'
         ])->validate();
 

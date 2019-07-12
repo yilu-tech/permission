@@ -19,4 +19,25 @@ class Util
         return $array[$key];
     }
 
+    public static function str_path_match(string $rule, string $subject, string $delimiter = '.'): bool
+    {
+        $units = explode($delimiter, $rule);
+        $j = 0;
+        $k = -1;
+        foreach (explode($delimiter, $subject) as $i => $item) {
+            if (empty($units[$j]) && $k === -1) return false;
+
+            $unit = $units[$j];
+
+            if ($unit === '**') $k = $j;
+
+            if ($item === $unit || $unit === '*' || $unit === '**') {
+                $j++;
+            } else {
+                if ($k === -1) return false;
+                $j = $k + 1;
+            }
+        }
+        return $j === count($units);
+    }
 }

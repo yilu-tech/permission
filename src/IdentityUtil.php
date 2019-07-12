@@ -3,8 +3,26 @@
 namespace YiluTech\Permission;
 
 
-class Identity
+use Illuminate\Support\Facades\Auth;
+
+class IdentityUtil
 {
+    public static function getIdentifier()
+    {
+        if (!($user = Auth::user())) {
+            return null;
+        }
+        $identifier = $user->getAuthIdentifier();
+        if (is_int($identifier)) {
+            return [];
+        }
+        if (is_string($identifier)) {
+            $identifier = explode('.', $identifier);
+        }
+        array_pop($identifier);
+        return $identifier;
+    }
+
     public static function getScopeKeys()
     {
         $keys = array();
@@ -20,7 +38,7 @@ class Identity
      */
     public static function getScopeValues($model)
     {
-        return array_intersect_key($model->getOriginal(), array_flip(Identity::getScopeKeys()));
+        return array_intersect_key($model->getOriginal(), array_flip(IdentityUtil::getScopeKeys()));
     }
 
     /**
@@ -48,11 +66,11 @@ class Identity
         return config("permission.identity.names.$index") . ':' . $scopeValue[$index];
     }
 
-    public static function whereIdentity($query, $identity, $system = null, $table = 'user_has_roles')
+    public static function whereIdentity($query, $identifier, $system = null, $table = 'user_has_roles')
     {
-        $identity = self::formatIdentity($identity);
+        $identifier = self::formatIdentity($identifier);
 
-        $lastIndex = count($identity) - 1;
+        $lastIndex = count($identifier) - 1;
 
         $unique = config('permission.identity.unique');
         $default = config('permission.identity.default');
@@ -61,7 +79,7 @@ class Identity
             $system = config('permission.identity.system');
         }
 
-        foreach ($identity as $key => $value) {
+        foreach ($identifier as $key => $value) {
             $field = "$table.scope_$key";
 
             if (!$unique || $value === 0 || $key === $lastIndex) {
@@ -70,7 +88,7 @@ class Identity
             }
 
             $nextIndex = $key + 1;
-            if ($nextIndex < $lastIndex && $identity[$nextIndex] === 0) {
+            if ($nextIndex < $lastIndex && $identifier[$nextIndex] === 0) {
                 if ($value === -1) {
                     $query->where($field, $value);
                     continue;
@@ -85,7 +103,7 @@ class Identity
         return $query;
     }
 
-    public static function formatIdentity($identity)
+    public static function formatIdentity($identifier)
     {
         $format = [];
 
@@ -99,9 +117,9 @@ class Identity
                 continue;
             }
 
-            if (isset($identity[$keys[$index]])) {
-                $value = $identity[$keys[$index]];
-            } elseif (!isset($identity[$index])) {
+            if (isset($identifier[$keys[$index]])) {
+                $value = $identifier[$keys[$index]];
+            } elseif (!isset($identifier[$index])) {
                 $value = 0;
             }
 

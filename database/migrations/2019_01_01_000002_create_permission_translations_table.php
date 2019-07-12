@@ -15,9 +15,9 @@ class CreatePermissionTranslationsTable extends Migration
     {
         Schema::create('permission_translations', function (Blueprint $table) {
             $table->increments('id');
-            $table->unsignedInteger('permission_id');
+            $table->string('name', 40);
             $table->string('lang', 16);
-            $table->string('context', 64);
+            $table->string('content', 64);
             $table->string('description')->nullable();
             $table->timestamps();
         });

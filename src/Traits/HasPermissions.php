@@ -103,10 +103,7 @@ trait HasPermissions
                 return $a->id == $b->id ? 0 : -1;
             }) : [];
 
-        $childRoles = $permission ? $this->includePermissions()->diffUsing($permission, function ($a, $b) {
-            return $a->id == $b->id ? 0 : -1;
-        }) : collect([]);
-        return $this->setRelation('includePermissions', $childRoles)->unsetRelation('permissions');
+        return $this->unsetRelation('permissions');
     }
 
     protected function getStoredPermission($permissions)

@@ -2,7 +2,7 @@
 
 namespace YiluTech\Permission\Traits;
 
-use YiluTech\Permission\Identity;
+use YiluTech\Permission\IdentityUtil;
 use YiluTech\Permission\Util;
 use YiluTech\Permission\Models\Role;
 
@@ -105,7 +105,7 @@ trait HasRoles
         })->each(function ($role) {
             $data = ['user_id' => $this->id, 'role_id' => $role->id];
             if (array_key_exists(HasIdentity::class, class_uses($this))) {
-                $data = array_merge($data, array_combine(Identity::getScopeKeys(), $this->getIdentity()));
+                $data = array_merge($data, array_combine(IdentityUtil::getScopeKeys(), $this->getIdentity()));
             }
             \DB::table('user_has_roles')->insert($data);
             $this->roles()->push($role);

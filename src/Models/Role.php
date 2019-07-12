@@ -3,7 +3,7 @@
 namespace YiluTech\Permission\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use YiluTech\Permission\Identity;
+use YiluTech\Permission\IdentityUtil;
 use YiluTech\Permission\Traits\HasChildRoles;
 use YiluTech\Permission\Traits\HasPermissions;
 
@@ -21,21 +21,21 @@ class Role extends Model
 
     public function __construct(array $attributes = [])
     {
-        $this->fillable = array_merge($this->fillable, Identity::getScopeKeys());
+        $this->fillable = array_merge($this->fillable, IdentityUtil::getScopeKeys());
 
         parent::__construct($attributes);
     }
 
     /**
      * @param $attributes
-     * @param null $identity
-     * @return static
+     * @param null $identifier
+     * @return $this
      */
-    public static function create($attributes, $identity = null)
+    public static function create($attributes, $identifier = null)
     {
         if (config('permission.identity.names')) {
-            $identity = Identity::formatIdentity($identity ?? []);
-            $attributes = array_merge($attributes, array_combine(Identity::getScopeKeys(), $identity));
+            $identifier = IdentityUtil::formatIdentity($identifier ?? []);
+            $attributes = array_merge($attributes, array_combine(IdentityUtil::getScopeKeys(), $identifier));
         }
         return static::query()->create($attributes);
     }

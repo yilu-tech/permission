@@ -2,7 +2,7 @@
 
 namespace YiluTech\Permission\Traits;
 
-use YiluTech\Permission\Identity;
+use YiluTech\Permission\IdentityUtil;
 use YiluTech\Permission\Util;
 
 trait HasIdentity
@@ -16,7 +16,7 @@ trait HasIdentity
             $this->useIdentity = false;
 
             $permissions = $this->unsetRelation('roles')->roles()->groupBy(function ($role) {
-                return Identity::getCacheKey($role);
+                return IdentityUtil::getCacheKey($role);
             })->map(function ($roles) {
                 return $roles->flatMap(function ($role) {
                     return $role->permissions();
@@ -31,7 +31,7 @@ trait HasIdentity
 
     public function whereIdentity($query)
     {
-        return Identity::whereIdentity($query, $this->getIdentity());
+        return IdentityUtil::whereIdentity($query, $this->getIdentity());
     }
 
     public function getIdentity()
@@ -39,6 +39,6 @@ trait HasIdentity
         $identity = method_exists($this, 'identity')
             ? $this->identity()
             : array_intersect_key($this->original, array_flip(config('permission.identity.names', [])));
-        return Identity::formatIdentity($identity);
+        return IdentityUtil::formatIdentity($identity);
     }
 }

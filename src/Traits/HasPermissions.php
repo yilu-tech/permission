@@ -13,7 +13,7 @@ trait HasPermissions
     public function permissions()
     {
         return Util::array_get($this->relations, 'permissions', function () {
-            $permissions = $this->includePermissions();
+            $permissions = $this->includePermissions;
 
             if (array_key_exists(HasChildRoles::class, class_uses($this))) {
                 $permissions = $permissions->merge($this->childRoles()->flatMap(function ($role) {
@@ -28,15 +28,15 @@ trait HasPermissions
     /**
      * @return \Illuminate\Support\Collection
      */
-    public function includePermissions()
-    {
-        return Util::array_get($this->relations, 'includePermissions', function () {
-            return Permission::query()->join('role_has_permissions', 'id', '=', 'permission_id')
-                ->select('permissions.*', 'config')
-                ->where('role_id', '=', $this->id)
-                ->get();
-        });
-    }
+//    public function includePermissions()
+//    {
+//        return Util::array_get($this->relations, 'includePermissions', function () {
+//            return Permission::query()->join('role_has_permissions', 'id', '=', 'permission_id')
+//                ->select('permissions.*', 'config')
+//                ->where('role_id', '=', $this->id)
+//                ->get();
+//        });
+//    }
 
     public function hasPermission($permission): bool
     {
@@ -81,7 +81,7 @@ trait HasPermissions
                 'role_id' => $this->id,
                 'permission_id' => $permission->id
             ]);
-            $this->includePermissions()->push($permission);
+            $this->includePermissions->push($permission);
         });
         return $this->unsetRelation('permissions');
     }
@@ -99,9 +99,9 @@ trait HasPermissions
         $query->delete();
 
         $this->relations['includePermissions'] = $permission
-            ? $this->includePermissions()->diffUsing($permission, function ($a, $b) {
+            ? $this->includePermissions->diffUsing($permission, function ($a, $b) {
                 return $a->id == $b->id ? 0 : -1;
-            }) : [];
+            }) : collect([]);
 
         return $this->unsetRelation('permissions');
     }

@@ -2,24 +2,29 @@
 
 namespace YiluTech\Permission\Traits;
 
-use YiluTech\Permission\IdentityUtil;
 use YiluTech\Permission\Util;
 use YiluTech\Permission\Models\Role;
 
 trait HasRoles
 {
+    public function getRoleGroup()
+    {
+        return method_exists($this, 'roleGroup') ? $this->roleGroup() : $this->roleGroup;
+    }
+
     /**
+     * @param bool $use_group
      * @return \Illuminate\Support\Collection
      */
-    public function roles()
+    public function roles($use_group = true)
     {
-        return Util::array_get($this->relations, 'roles', function () {
+        return Util::array_get($this->relations, 'roles', function () use ($use_group) {
             $query = Role::query()->join('user_has_roles', 'roles.id', '=', 'role_id')
                 ->where('user_id', '=', $this->id)
                 ->select('roles.*', 'user_has_roles.*');
 
-            if (array_key_exists(HasIdentity::class, class_uses($this)) && $this->useIdentity) {
-                $this->whereIdentity($query);
+            if ($use_group && $group = $this->getRoleGroup()) {
+                $query->where('user_has_roles.group', $group);
             }
 
             return $query->get();
@@ -40,28 +45,29 @@ trait HasRoles
 
     public function syncCache()
     {
-        if (array_key_exists(HasIdentity::class, class_uses($this))) {
-            $cacheValues = $this->identityPermissions();
-        } else {
-            $cacheValues[''] = $this->permissions();
-        }
-
+        $cacheValues = $this->roles(false)->groupBy('group')->map(function ($roles) {
+            $permissions = $roles->flatMap(function ($role) {
+                return $role->permissions();
+            });
+            $items = [];
+            foreach ($permissions as $permission) {
+                $items[$permission->id] = $permission->name;
+            }
+            return $items;
+        })->all();
         $cacheValues['sync_time'] = date('Y-m-d H:i:s');
-        $cacheValues['is_administrator'] = method_exists($this, 'isAdministrator') ? $this->isAdministrator() : false;
+        $cacheValues['is_administrator'] = method_exists($this, 'isAdministrator') ? ($this->isAdministrator() ? 1 : 0) : 0;
 
         $prefix = $this->getCachePrefix();
-
         \Redis::multi();
 
         $this->clearCache();
-
         $keys = ["$prefix:keys"];
-
         foreach ($cacheValues as $key => $value) {
             if ($key) {
                 $key = $key{0} === '@' ? substr($key, 1) : "$prefix:$key";
             } else {
-                $key = $prefix;
+                $key = "$prefix:default";
             }
             if (is_array($value)) {
                 \Redis::hmset($key, $value);
@@ -70,10 +76,8 @@ trait HasRoles
             }
             $keys[] = $key;
         }
-
         \Redis::sadd("$prefix:keys", $keys);
         \Redis::exec();
-
         return $this;
     }
 
@@ -103,11 +107,8 @@ trait HasRoles
                 throw new \Exception('role already exists');
             }
         })->each(function ($role) {
-            $data = ['user_id' => $this->id, 'role_id' => $role->id];
-            if (array_key_exists(HasIdentity::class, class_uses($this))) {
-                $data = array_merge($data, array_combine(IdentityUtil::getScopeKeys(), $this->getIdentity()));
-            }
-            \DB::table('user_has_roles')->insert($data);
+            $group = $this->getRoleGroup() ?? $role->group ?? 0;
+            \DB::table('user_has_roles')->insert(['user_id' => $this->id, 'role_id' => $role->id, 'group' => $group]);
             $this->roles()->push($role);
         });
         return $this->unsetRelation('permissions');
@@ -124,8 +125,8 @@ trait HasRoles
         if ($roles) {
             $query->whereIn('role_id', collect($roles)->pluck('id'));
         }
-        if (array_key_exists(HasIdentity::class, class_uses($this))) {
-            $this->whereIdentity($query);
+        if ($group = $this->getRoleGroup()) {
+            $query->where('group', $group);
         }
         $query->delete();
 
@@ -138,8 +139,8 @@ trait HasRoles
     public function hasRole($role): bool
     {
         return $this->roles()->flatMap(function ($role) {
-            if (array_key_exists(HasChildRoles::class, class_uses($this))) {
-                return $role->allChildRoles();
+            if (array_key_exists(HasChildRoles::class, class_uses($role))) {
+                return $role->allChildRoles()->push($role);
             }
             return $role;
         })->contains('id', $this->getStoredRole($role)->id);

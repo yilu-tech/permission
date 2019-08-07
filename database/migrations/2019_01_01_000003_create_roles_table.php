@@ -15,13 +15,12 @@ class CreateRolesTable extends Migration
     {
         Schema::create('roles', function (Blueprint $table) {
             $table->increments('id');
-            $table->string('name', 64);
+            $table->string('name', 63);
 
-            foreach (config('permission.identity.names', []) as $index => $item) {
-                $table->integer("scope_$index");
-            }
+            $table->string('group', 32)->nullable();
+            $table->string('parent_group', 32)->nullable();
 
-            $table->string('config', 512)->nullable();
+            $table->string('config', 1023)->nullable();
             $table->string('description')->nullable();
             $table->integer('children')->default(0);
             $table->timestamps();

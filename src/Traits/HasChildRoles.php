@@ -151,7 +151,7 @@ trait HasChildRoles
 
     protected function hasChild()
     {
-        return $this->getOriginal('children', 0) > 0;
+        return $this->getOriginal('child_length', 0) > 0;
     }
 
     protected function getStoredRole($role)

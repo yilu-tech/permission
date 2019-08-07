@@ -3,7 +3,6 @@
 namespace YiluTech\Permission\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use YiluTech\Permission\IdentityUtil;
 use YiluTech\Permission\Traits\HasChildRoles;
 use YiluTech\Permission\Traits\HasPermissions;
 
@@ -13,32 +12,11 @@ class Role extends Model
 
     protected $table = 'roles';
 
-    protected $fillable = ['id', 'name', 'config', 'description', 'children'];
+    protected $fillable = ['id', 'name', 'group', 'parent_group', 'config', 'description', 'child_length'];
 
     protected $casts = [
         'config' => 'json',
     ];
-
-    public function __construct(array $attributes = [])
-    {
-        $this->fillable = array_merge($this->fillable, IdentityUtil::getScopeKeys());
-
-        parent::__construct($attributes);
-    }
-
-    /**
-     * @param $attributes
-     * @param null $identifier
-     * @return $this
-     */
-    public static function create($attributes, $identifier = null)
-    {
-        if (config('permission.identity.names')) {
-            $identifier = IdentityUtil::formatIdentity($identifier ?? []);
-            $attributes = array_merge($attributes, array_combine(IdentityUtil::getScopeKeys(), $identifier));
-        }
-        return static::query()->create($attributes);
-    }
 
     public static function findById(int $id)
     {
@@ -53,5 +31,10 @@ class Role extends Model
     public function users()
     {
         return $this->belongsToMany(config('permission.user.model'), 'user_has_roles', 'role_id', 'user_id');
+    }
+
+    public function includePermissions()
+    {
+        return $this->belongsToMany(Permission::class, 'role_has_permissions', 'role_id', 'permission_id');
     }
 }

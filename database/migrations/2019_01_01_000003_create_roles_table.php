@@ -22,7 +22,7 @@ class CreateRolesTable extends Migration
 
             $table->string('config', 1023)->nullable();
             $table->string('description')->nullable();
-            $table->integer('children')->default(0);
+            $table->integer('child_length')->default(0);
             $table->timestamps();
         });
     }

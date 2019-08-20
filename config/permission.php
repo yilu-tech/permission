@@ -5,11 +5,20 @@ return [
         'model' => \App\User::class
     ],
 
+    'role' => [
+        'group_value' => [
+
+        ]
+    ],
+
     'route_option' => [
 
     ],
 
     'migration_path' => '',
 
-    'cache_prefix' => '',
+    'cache' => [
+        'prefix' => 'permission',
+        'expire' => 15
+    ],
 ];

@@ -2,42 +2,42 @@
 
 namespace YiluTech\Permission\Traits;
 
+use Illuminate\Support\Facades\Auth;
+use YiluTech\Permission\PermissionCache;
 use YiluTech\Permission\Util;
 use YiluTech\Permission\Models\Role;
 
 trait HasRoles
 {
-    public function getRoleGroup()
-    {
-        return method_exists($this, 'roleGroup') ? $this->roleGroup() : $this->roleGroup;
-    }
-
     /**
-     * @param bool $use_group
+     * @param string $group
      * @return \Illuminate\Support\Collection
      */
-    public function roles($use_group = true)
+    public function roles($group = null)
     {
-        return Util::array_get($this->relations, 'roles', function () use ($use_group) {
-            $query = Role::query()->join('user_has_roles', 'roles.id', '=', 'role_id')
+        $key = $group ? 'roles_' . str_replace(':', '_', $group) : 'roles';
+        return Util::array_get($this->relations, $key, function () use ($group) {
+            $query = \DB::table('user_has_roles')->leftJoin('roles', 'roles.id', 'user_has_roles.role_id')
                 ->where('user_id', '=', $this->id)
                 ->select('roles.*', 'user_has_roles.*');
-
-            if ($use_group && $group = $this->getRoleGroup()) {
+            if ($group) {
                 $query->where('user_has_roles.group', $group);
             }
-
-            return $query->get();
+            return $query->get()->map(function ($item) {
+                return new Role((array)$item);
+            });
         });
     }
 
     /**
+     * @param string $group
      * @return \Illuminate\Support\Collection
      */
-    public function permissions()
+    public function permissions($group = null)
     {
-        return Util::array_get($this->relations, 'permissions', function () {
-            return $this->relations['permissions'] = $this->roles()->flatMap(function ($role) {
+        $key = $group ? 'permissions_' . str_replace(':', '_', $group) : 'permissions';
+        return Util::array_get($this->relations, $key, function () use ($group) {
+            return $this->relations['permissions'] = $this->roles($group)->flatMap(function ($role) {
                 return $role->permissions();
             })->unique('id');
         });
@@ -45,70 +45,32 @@ trait HasRoles
 
     public function syncCache()
     {
-        $cacheValues = $this->roles(false)->groupBy('group')->map(function ($roles) {
-            $permissions = $roles->flatMap(function ($role) {
-                return $role->permissions();
-            });
-            $items = [];
-            foreach ($permissions as $permission) {
-                $items[$permission->id] = $permission->name;
-            }
-            return $items;
-        })->all();
-        $cacheValues['sync_time'] = date('Y-m-d H:i:s');
-        $cacheValues['is_administrator'] = method_exists($this, 'isAdministrator') ? ($this->isAdministrator() ? 1 : 0) : 0;
-
-        $prefix = $this->getCachePrefix();
-        \Redis::multi();
-
-        $this->clearCache();
-        $keys = ["$prefix:keys"];
-        foreach ($cacheValues as $key => $value) {
-            if ($key) {
-                $key = $key{0} === '@' ? substr($key, 1) : "$prefix:$key";
-            } else {
-                $key = "$prefix:default";
-            }
-            if (is_array($value)) {
-                \Redis::hmset($key, $value);
-            } else {
-                \Redis::set($key, $value);
-            }
-            $keys[] = $key;
-        }
-        \Redis::sadd("$prefix:keys", $keys);
-        \Redis::exec();
+        (new PermissionCache($this))->sync();
         return $this;
     }
 
     public function clearCache()
     {
-        $prefix = $this->getCachePrefix();
-
-        $keys = \Redis::smembers("$prefix:keys");
-
-        if (is_array($keys) && count($keys)) \Redis::del($keys);
-
+        (new PermissionCache($this))->clear();
         return $this;
-    }
-
-    public function getCachePrefix()
-    {
-        $prefix = config('permission.cache_prefix') ?: 'permission';
-        return $prefix . ':' . $this->id;
     }
 
     public function giveRoleTo($roles)
     {
+        if ($this->id == Auth::id()) {
+            throw new \Exception('can not give role to self.');
+        }
         collect($roles)->map(function ($role) {
             return $this->getStoredRole($role);
-        })->each(function ($role) use ($roles) {
+        })->each(function ($role) {
             if ($this->hasRole($role)) {
                 throw new \Exception('role already exists');
             }
+            if (!Auth::hasUser() || !Auth::user()->hasRoleGroup($role->group)) {
+                throw new \Exception('no permission operation.');
+            }
         })->each(function ($role) {
-            $group = $this->getRoleGroup() ?? $role->group ?? 0;
-            \DB::table('user_has_roles')->insert(['user_id' => $this->id, 'role_id' => $role->id, 'group' => $group]);
+            \DB::table('user_has_roles')->insert(['user_id' => $this->id, 'role_id' => $role->id, 'group' => $role->group]);
             $this->roles()->push($role);
         });
         return $this->unsetRelation('permissions');
@@ -119,14 +81,17 @@ trait HasRoles
         return $this->revokeRoleTo()->giveRoleTo($roles);
     }
 
-    public function revokeRoleTo($roles = null)
+    public function revokeRoleTo($roles = null, $group = false)
     {
+        if ($this->id == Auth::id()) {
+            throw new \Exception('can not give role to self.');
+        }
         $query = \DB::table('user_has_roles')->where('user_id', $this->id);
         if ($roles) {
             $query->whereIn('role_id', collect($roles)->pluck('id'));
         }
-        if ($group = $this->getRoleGroup()) {
-            $query->where('group', $group);
+        if ($group === false) {
+            $query->whereIn('role_id', collect($roles)->pluck('id'));
         }
         $query->delete();
 
@@ -156,8 +121,11 @@ trait HasRoles
         return false;
     }
 
-    public function hasAllRole($roles)
+    public function hasAllRole($roles = null)
     {
+        if (!$roles && method_exists($this, 'isAdministrator') && $this->isAdministrator()) {
+            return true;
+        }
         foreach ($roles as $role) {
             if (!$this->hasRole($role)) {
                 return false;
@@ -166,18 +134,30 @@ trait HasRoles
         return true;
     }
 
+    public function HasRoleGroup($group)
+    {
+        if ($this->hasAllRole()) {
+            return true;
+        }
+        foreach ($this->roles(Util::parse_role_group($group)['key']) as $role) {
+            if ($role->isAdministrator()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     protected function getStoredRole($role)
     {
         if (is_numeric($role)) {
             $role = Role::findById($role);
         } elseif (is_string($role)) {
             $role = Role::findByName($role);
+        } elseif (is_array($role)) {
+            return array_map([$this, 'getStoredRole'], $role);
         }
         if (!($role instanceof Role)) {
             throw new \Exception('role not exists');
-        }
-        if (is_array($role)) {
-            return array_map([$this, 'getStoredRole'], $role);
         }
         return $role;
     }

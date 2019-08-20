@@ -5,6 +5,7 @@ namespace YiluTech\Permission\Models;
 use Illuminate\Database\Eloquent\Model;
 use YiluTech\Permission\Traits\HasChildRoles;
 use YiluTech\Permission\Traits\HasPermissions;
+use YiluTech\Permission\Util;
 
 class Role extends Model
 {
@@ -12,7 +13,7 @@ class Role extends Model
 
     protected $table = 'roles';
 
-    protected $fillable = ['id', 'name', 'group', 'parent_group', 'config', 'description', 'child_length'];
+    protected $fillable = ['id', 'name', 'group', 'config', 'description', 'child_length'];
 
     protected $casts = [
         'config' => 'json',
@@ -28,13 +29,18 @@ class Role extends Model
         return static::query()->where('name', $name)->first();
     }
 
+    public function isAdministrator()
+    {
+        return $this->getAttribute('child_length') == -1;
+    }
+
+    public function groupInfo()
+    {
+        return Util::parse_role_group($this->getAttribute('group'));
+    }
+
     public function users()
     {
         return $this->belongsToMany(config('permission.user.model'), 'user_has_roles', 'role_id', 'user_id');
-    }
-
-    public function includePermissions()
-    {
-        return $this->belongsToMany(Permission::class, 'role_has_permissions', 'role_id', 'permission_id');
     }
 }

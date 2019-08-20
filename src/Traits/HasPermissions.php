@@ -13,7 +13,7 @@ trait HasPermissions
     public function permissions()
     {
         return Util::array_get($this->relations, 'permissions', function () {
-            $permissions = $this->includePermissions;
+            $permissions = $this->includePermissions();
 
             if (array_key_exists(HasChildRoles::class, class_uses($this))) {
                 $permissions = $permissions->merge($this->childRoles()->flatMap(function ($role) {
@@ -28,15 +28,18 @@ trait HasPermissions
     /**
      * @return \Illuminate\Support\Collection
      */
-//    public function includePermissions()
-//    {
-//        return Util::array_get($this->relations, 'includePermissions', function () {
-//            return Permission::query()->join('role_has_permissions', 'id', '=', 'permission_id')
-//                ->select('permissions.*', 'config')
-//                ->where('role_id', '=', $this->id)
-//                ->get();
-//        });
-//    }
+    public function includePermissions()
+    {
+        return Util::array_get($this->relations, 'includePermissions', function () {
+            if ($this->isAdministrator()) {
+                return Permission::query()->where('group', $this->groupInfo()['key']);
+            }
+            return \DB::table('role_has_permissions')->leftJoin('permissions', 'permissions.id', 'role_has_permissions.permission_id')
+                ->where('role_id', '=', $this->id)->select('permissions.*', 'config')->get()->map(function ($item) {
+                    return new Permission((array)$item);
+                });
+        });
+    }
 
     public function hasPermission($permission): bool
     {
@@ -77,29 +80,26 @@ trait HasPermissions
                 throw new \Exception('permission already exists');
             }
         })->each(function ($permission) {
-            \DB::table('role_has_permissions')->insert([
-                'role_id' => $this->id,
-                'permission_id' => $permission->id
-            ]);
-            $this->includePermissions->push($permission);
+            \DB::table('role_has_permissions')->insert(['role_id' => $this->id, 'permission_id' => $permission->id]);
+            $this->includePermissions()->push($permission);
         });
         return $this->unsetRelation('permissions');
     }
 
     /**
-     * @param null $permission
+     * @param null $permissions
      * @return static
      */
-    public function revokePermissionTo($permission = null)
+    public function revokePermissionTo($permissions = null)
     {
         $query = \DB::table('role_has_permissions')->where('role_id', $this->id);
-        if ($permission) {
-            $query->whereIn('permission_id', collect($permission)->pluck('id'));
+        if ($permissions) {
+            $query->whereIn('permission_id', collect($permissions)->pluck('id'));
         }
         $query->delete();
 
-        $this->relations['includePermissions'] = $permission
-            ? $this->includePermissions->diffUsing($permission, function ($a, $b) {
+        $this->relations['includePermissions'] = $permissions
+            ? $this->includePermissions()->diffUsing($permissions, function ($a, $b) {
                 return $a->id == $b->id ? 0 : -1;
             }) : collect([]);
 
@@ -112,12 +112,12 @@ trait HasPermissions
             $permissions = Permission::findById($permissions);
         } elseif (is_string($permissions)) {
             $permissions = Permission::findByName($permissions);
+        } elseif (is_array($permissions)) {
+            return array_map([$this, 'getStoredPermission'], $permissions);
         }
+
         if (!($permissions instanceof Permission)) {
             throw new \Exception('permission not exists');
-        }
-        if (is_array($permissions)) {
-            return array_map([$this, 'getStoredPermission'], $permissions);
         }
         return $permissions;
     }

@@ -12,25 +12,26 @@ use YiluTech\Permission\Models\Role;
 
 class RoleController
 {
+    protected function getRoleGroup()
+    {
+        if (!\Request::has('group')) {
+            return null;
+        }
+        $group = config('permission.role.group_value.' . \Request::input('group'));
+        if (!$group || !\Request::input($group)) {
+            throw new \Exception('get role group error.');
+        }
+        return \Request::input('group') . ':' . \Request::input($group);
+    }
+
     public function list()
     {
-        $query = Role::query()->leftJoin('role_has_roles', 'role_has_roles.role_id', 'roles.id')
-            ->select('roles.*', \DB::raw('group_concat(child_id separator ",") as child_keys'))->groupBy('id');
-        if (\Request::has('with_permission')) {
-            $query->with('includePermissions');
-        }
-
-        if ($group = \Request::input('group')) {
-            $query->where('group', $group);
-        }
-
-        if ($parent_group = \Request::input('parent_group')) {
-            $query->where('parent_group', $parent_group);
-        }
-
-        return $query->get()->each(function ($item) {
-            $item->child_keys = $item->child_keys ? explode(',', $item->child_keys) : [];
-        });
+        return Role::query()->leftJoin('role_has_roles', 'role_has_roles.role_id', 'roles.id')
+            ->select('roles.*', \DB::raw('group_concat(child_id separator ",") as child_keys'))
+            ->where('group', $this->getRoleGroup())
+            ->groupBy('id')->get()->each(function ($item) {
+                $item->child_keys = $item->child_keys ? explode(',', $item->child_keys) : [];
+            });
     }
 
     public function create()
@@ -39,15 +40,13 @@ class RoleController
             'name' => ['required', 'regex:/^[A-Za-z0-9\x{4e00}-\x{9fa5}_-]{2,16}$/u'],
             'description' => 'nullable|string|max:255',
             'config' => 'nullable',
-            'group' => ['nullable', 'regex:/^[A-Za-z0-9:.*]{2,32}$'],
-            'parent_group' => ['nullable', 'regex:/^[A-Za-z0-9:.*]{2,32}$'],
-            'identity' => 'nullable|array|min:1',
             'roles' => 'array',
             'permissions' => 'array'
         ]);
+        $data = \Request::only(['name', 'description', 'config']);
+        $data['group'] = $this->getRoleGroup();
 
-        return \DB::transaction(function () {
-            $data = \Request::only(['name', 'description', 'config', 'group', 'parent_group']);
+        return \DB::transaction(function () use ($data) {
             $data['child_length'] = count($roles = \Request::input('roles', []));
             $role = Role::create($data);
 
@@ -69,8 +68,6 @@ class RoleController
             'name' => ['required', 'regex:/^[A-Za-z0-9\x{4e00}-\x{9fa5}_-]{2,16}$/u'],
             'description' => 'nullable|string|max:255',
             'config' => 'nullable',
-            'group' => ['nullable', 'regex:/^[A-Za-z0-9:.*]{2,32}$'],
-            'parent_group' => ['nullable', 'regex:/^[A-Za-z0-9:.*]{2,32}$'],
             'roles' => 'array',
             'permissions' => 'array'
         ]);
@@ -78,15 +75,12 @@ class RoleController
         if (!$role) throw new \Exception('role not found');
 
         return \DB::transaction(function () use ($role) {
-            $data = \Request::only(['name', 'description', 'config', 'group', 'parent_group']);
+            $data = \Request::only(['name', 'description', 'config']);
             $data['child_length'] = count($roles = \Request::input('roles', []));
-
             $role->update($data);
-
             if ($data['child_length']) {
                 $role->syncChildRoles($roles);
             }
-
             if (count($permissions = \Request::input('permissions', []))) {
                 $role->syncPermissions($permissions);
             }

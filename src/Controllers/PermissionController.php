@@ -10,6 +10,7 @@ namespace YiluTech\Permission\Controllers;
 
 use YiluTech\Permission\Models\Permission;
 use YiluTech\Permission\Models\PermissionTranslation;
+use YiluTech\Permission\Models\Role;
 use YiluTech\Permission\Util;
 
 class PermissionController
@@ -17,27 +18,25 @@ class PermissionController
     public function list()
     {
         if ($role_id = (int)\Request::input('role_id')) {
-            $query = \DB::table('role_has_permissions')->join('permissions', 'permissions.id', 'role_has_permissions.permission_id');
-            if (\Request::has('with_child')) {
-                $ids = \DB::table('role_has_roles as a')
-                    ->leftJoin('role_has_roles as b', 'a.child_id', 'b.role_id')
-                    ->where('a.role_id', $role_id)
-                    ->select('a.child_id as a_id', 'b.child_id as b_id')->get()->flatMap(function ($item) {
-                        return [$item->a_id, $item->b_id];
-                    })->push($role_id)->unique()->filter()->all();
-                $query->whereIn('role_id', $ids);
-            } else {
-                $query->where('role_id', $role_id);
+            $role = Role::findById($role_id);
+            if (!$role) {
+                throw new \Exception('role not found');
             }
-            $query->select('permissions.*');
+            if (\Request::has('with_child')) {
+                $permissions = $role->permissions();
+            } else {
+                $permissions = $role->includePermissions();
+            }
         } else {
             $query = Permission::query();
+            if (\Request::has('group')) {
+                $query->where('group', \Request::input('group'));
+            }
+            $permissions = $query->get();
         }
-        if (\Request::has('group')) {
-            $query->where('group', \Request::input('group'));
-        }
+
         $translations = PermissionTranslation::query()->where('lang', app()->getLocale())->get();
-        return $query->get()->each(function ($item) use ($translations) {
+        return $permissions->each(function ($item) use ($translations) {
             foreach ($translations as $translation) {
                 if (Util::str_path_match($translation->name, $item->name)) {
                     $item->translation = $translation->content;

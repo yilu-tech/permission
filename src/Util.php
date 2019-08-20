@@ -40,4 +40,13 @@ class Util
         }
         return $j === count($units);
     }
+
+    public static function parse_role_group(string $group)
+    {
+        $parts = explode(':', $group, 2);
+        return [
+            'key' => $parts[0] ?: null,
+            'value' => isset($parts[1]) ? $parts[1] : null
+        ];
+    }
 }

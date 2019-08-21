@@ -41,7 +41,7 @@ class Util
         return $j === count($units);
     }
 
-    public static function parse_role_group(string $group)
+    public static function parse_role_group($group)
     {
         $parts = explode(':', $group, 2);
         return [

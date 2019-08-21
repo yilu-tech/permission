@@ -43,13 +43,13 @@ trait HasRoles
         });
     }
 
-    public function syncCache()
+    public function syncPermissionCache()
     {
         (new PermissionCache($this))->sync();
         return $this;
     }
 
-    public function clearCache()
+    public function clearPermissionCache()
     {
         (new PermissionCache($this))->clear();
         return $this;
@@ -111,7 +111,7 @@ trait HasRoles
         })->contains('id', $this->getStoredRole($role)->id);
     }
 
-    public function hasAnyRole($roles): bool
+    public function hasAnyRoles($roles): bool
     {
         foreach ($roles as $role) {
             if ($this->hasRole($role)) {
@@ -121,10 +121,10 @@ trait HasRoles
         return false;
     }
 
-    public function hasAllRole($roles = null)
+    public function hasAllRoles($roles = null)
     {
-        if (!$roles && method_exists($this, 'isAdministrator') && $this->isAdministrator()) {
-            return true;
+        if (!$roles) {
+            return method_exists($this, 'isAdministrator') && $this->isAdministrator();
         }
         foreach ($roles as $role) {
             if (!$this->hasRole($role)) {

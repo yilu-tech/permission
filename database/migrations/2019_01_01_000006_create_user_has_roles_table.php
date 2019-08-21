@@ -16,7 +16,7 @@ class CreateUserHasRolesTable extends Migration
         Schema::create('user_has_roles', function (Blueprint $table) {
             $table->unsignedInteger('user_id');
             $table->unsignedInteger('role_id');
-            $table->string('group', 32)->default('0');
+            $table->string('group', 32)->default('');
             $table->primary(['user_id', 'role_id', 'group']);
         });
     }

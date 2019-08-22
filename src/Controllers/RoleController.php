@@ -12,11 +12,23 @@ use YiluTech\Permission\Models\Role;
 
 class RoleController
 {
+    protected function getRoleGroup()
+    {
+        if (!\Request::has('group')) {
+            return '';
+        }
+        $group = config('permission.role.group_value.' . \Request::input('group'));
+        if (!$group || !\Request::input($group)) {
+            throw new \Exception('get role group error.');
+        }
+        return \Request::input('group') . ':' . \Request::input($group);
+    }
+
     public function list()
     {
         return Role::query()->leftJoin('role_has_roles', 'role_has_roles.role_id', 'roles.id')
             ->select('roles.*', \DB::raw('group_concat(child_id separator ",") as child_keys'))
-            ->where('group', \Request::input('group'))
+            ->where('group', $this->getRoleGroup())
             ->groupBy('id')->get()->each(function ($item) {
                 $item->child_keys = $item->child_keys ? explode(',', $item->child_keys) : [];
             });
@@ -32,7 +44,8 @@ class RoleController
             'roles' => 'array',
             'permissions' => 'array'
         ]);
-        $data = \Request::only(['name', 'description', 'config', 'group']);
+        $data = \Request::only(['name', 'description', 'config']);
+        $data['group'] = $this->getRoleGroup();
 
         return \DB::transaction(function () use ($data) {
             $data['child_length'] = count($roles = \Request::input('roles', []));

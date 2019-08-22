@@ -3,6 +3,7 @@
 
 namespace YiluTech\Permission;
 
+use Illuminate\Support\Facades\Redis;
 
 class PermissionCache
 {
@@ -15,6 +16,8 @@ class PermissionCache
 
     protected $expire;
 
+    protected $driver;
+
     public function __construct($user)
     {
         $this->user = $user;
@@ -22,60 +25,69 @@ class PermissionCache
         $this->expire = config('permission.cache.expire');
     }
 
-    public function sync()
+    protected function getDriver()
     {
-        $cacheValues = $this->getCacheValue();
-        $prefix = $this->getCachePrefix();
+        if (!$this->driver) {
+            $this->driver = Redis::connection();
+            $this->driver->getOptions()->prefix->setPrefix($this->getCachePrefix());
+        }
+        return $this->driver;
+    }
 
-        \Redis::multi();
+    public function sync(array $values = [])
+    {
+        $values = array_merge($this->getCacheValue(), $values);
+        $redis = $this->getDriver();
+
         $this->clear();
-        $keys = ["$prefix:keys"];
-        foreach ($cacheValues as $key => $value) {
-            $key = $key ? "$prefix:$key" : "$prefix:default";
+
+        $redis->multi();
+        foreach ($values as $key => $value) {
             if (is_array($value)) {
-                \Redis::hmset($key, $value);
+                $redis->hmset($key, $value);
             } else {
-                \Redis::set($key, $value);
+                $redis->set($key, $value);
             }
             $keys[] = $key;
         }
-        \Redis::sadd("$prefix:keys", $keys);
+        $keys[] = 'keys';
+        $redis->sadd('keys', $keys);
         if ($this->expire) {
-            foreach ($keys as $key) \Redis::expire($key, $this->expire * 86400);
+            foreach ($keys as $key) $redis->expire($key, $this->expire * 86400);
         }
-        \Redis::exec();
+        $redis->exec();
         return $this;
     }
 
     public function clear()
     {
-        $prefix = $this->getCachePrefix();
-        $keys = \Redis::smembers("$prefix:keys");
-        if (is_array($keys) && count($keys)) \Redis::del($keys);
+        $redis = $this->getDriver();
+        $keys = $redis->smembers('keys');
+        if (is_array($keys) && count($keys)) $redis->del($keys);
     }
 
     public function getCachePrefix()
     {
-        return $this->prefix . ':' . $this->user->id;
+        return $this->prefix . ':' . $this->user->id . ':';
     }
 
     protected function getCacheValue()
     {
         $values['sync_time'] = date('Y-m-d H:i:s');
-        $values['administrator'] = $this->user->hasAllRoles();
+        $values['administrator'] = $this->user->hasAllRoles() ? 1 : 0;
         foreach ($this->user->roles()->groupBy('group') as $group => $roles) {
             foreach ($roles as $role) {
                 if ($role->isAdministrator()) {
-                    $values[$group . ':is_administrator'] = 1;
+                    $values["$group:is_administrator"] = 1;
                     break;
                 }
             }
-            if (isset($values[$group . ':is_administrator'])) continue;
+            if (isset($values["$group:is_administrator"])) continue;
             $permissions = $roles->flatMap(function ($role) {
                 return $role->permissions();
             });
             foreach ($permissions as $permission) {
-                $values[$group][$permission->name] = $permission->config;
+                $values[$group][$permission->name] = $permission->config ?: 'null';
             }
         }
         return $values;

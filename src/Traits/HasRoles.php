@@ -43,9 +43,9 @@ trait HasRoles
         });
     }
 
-    public function syncPermissionCache()
+    public function syncPermissionCache(array $values = [])
     {
-        (new PermissionCache($this))->sync();
+        (new PermissionCache($this))->sync($values);
         return $this;
     }
 

@@ -43,14 +43,18 @@ class Util
 
     public static function get_query_role_group($name = 'group')
     {
+        $required = config('permission.role.group.required');
+
         if (!\Request::has($name)) {
-            if (config('permission.role.group.required')) {
+            if ($required) {
                 throw new \Exception('role group required.');
             }
             return false;
         }
         $name = \Request::input($name);
         $value = config("permission.role.group.values.$name");
+
+        if (!$value && !$name && !$required) return '';
 
         $isHeader = $value && $value{0} === '^';
         if ($isHeader) $value = substr($value, 1);

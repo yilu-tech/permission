@@ -15,13 +15,20 @@ class Permission extends Model
         'content' => 'json'
     ];
 
-    public static function findById(int $id)
+    public static function findById(int $id, $group = false)
     {
-        return static::query()->where('id', $id)->first();
+        if ($group === false) {
+            return static::query()->find($id);
+        }
+        return static::query()->where('group', $group)->find($id);
     }
 
-    public static function findByName(string $name)
+    public static function findByName(string $name, $group = false)
     {
-        return static::query()->where('name', $name)->first();
+        $query = static::query()->where('name', $name);
+        if ($group !== false) {
+            $query->where('group', $group);
+        }
+        return $query->first();
     }
 }

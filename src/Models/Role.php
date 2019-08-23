@@ -19,9 +19,12 @@ class Role extends Model
         'config' => 'json',
     ];
 
-    public static function findById(int $id)
+    public static function findById(int $id, $group = false)
     {
-        return static::query()->where('id', $id)->first();
+        if ($group === false) {
+            return static::query()->find($id);
+        }
+        return static::query()->where('group', $group)->find($id);
     }
 
     public static function findByName(string $name)

@@ -44,14 +44,21 @@ class Util
     public static function get_query_role_group($name = 'group')
     {
         if (!\Request::has($name)) {
-            return null;
+            if (config('permission.role.group.required')) {
+                throw new \Exception('role group required.');
+            }
+            return false;
         }
         $name = \Request::input($name);
-        $value = config("permission.role.group_value.$name");
-        if (!$value || !\Request::has($value)) {
-            throw new \Exception('get role group error.');
+        $value = config("permission.role.group.values.$name");
+
+        $isHeader = $value && $value{0} === '^';
+        if ($isHeader) $value = substr($value, 1);
+
+        if (!$value || ($isHeader && !\Request::header($value)) || !\Request::has($value)) {
+            throw new \Exception('role group value required.');
         }
-        return "$name:" . \Request::input($value);
+        return "$name:" . ($isHeader ? \Request::header($value) : \Request::input($value));
     }
 
     public static function parse_role_group($group)

@@ -41,6 +41,19 @@ class Util
         return $j === count($units);
     }
 
+    public static function get_query_role_group($name = 'group')
+    {
+        if (!\Request::has($name)) {
+            return null;
+        }
+        $name = \Request::input($name);
+        $value = config("permission.role.group_value.$name");
+        if (!$value || !\Request::has($value)) {
+            throw new \Exception('get role group error.');
+        }
+        return "$name:" . \Request::input($value);
+    }
+
     public static function parse_role_group($group)
     {
         $parts = explode(':', $group, 2);

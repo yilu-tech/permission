@@ -153,16 +153,15 @@ trait HasChildRoles
         return $this->getOriginal('child_length', 0) > 0;
     }
 
-    protected function getStoredRole($role)
+    protected function getStoredRole($role, $group = false)
     {
-        if (is_numeric($role)) {
-            $role = Role::findById($role);
-        } elseif (is_string($role)) {
-            $role = Role::findByName($role);
-        } elseif (is_array($role)) {
+        if (is_array($role)) {
             return array_map([$this, 'getStoredRole'], $role);
         }
-        if (!($role instanceof Role)) {
+        if (is_numeric($role)) {
+            $role = Role::findById($role, $group);
+        }
+        if (!($role instanceof Role) || ($group !== false && $role->group != $group)) {
             throw new \Exception('role not exists');
         }
         return $role;

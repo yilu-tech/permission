@@ -74,7 +74,7 @@ class PermissionCache
     protected function getCacheValue()
     {
         $values['sync_time'] = date('Y-m-d H:i:s');
-        $values['administrator'] = $this->user->hasAllRoles() ? 1 : 0;
+        $values['is_administrator'] = $this->user->hasAllRoles() ? 1 : 0;
         foreach ($this->user->roles()->groupBy('group') as $group => $roles) {
             foreach ($roles as $role) {
                 if ($role->isAdministrator()) {

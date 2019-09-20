@@ -31,6 +31,9 @@ class PermissionServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
+                \YiluTech\Permission\Commands\PermissionListCommand::class,
+                \YiluTech\Permission\Commands\PermissionRecordCommand::class,
+                \YiluTech\Permission\Commands\PermissionRollbackCommand::class,
             ]);
         }
 
@@ -58,6 +61,12 @@ class PermissionServiceProvider extends ServiceProvider
             Route::post('role/create', 'RoleController@create')->name('role.create');
             Route::post('role/update', 'RoleController@update')->name('role.update');
             Route::post('role/delete', 'RoleController@delete')->name('role.delete');
+        });
+
+        Route::group($this->app['config']['permission']['internal_route_option'] ?? [], function ($router) {
+            Route::post('permission/sync', function ($request) {
+                return PermissionDBSync::runRequest($request);
+            })->name('permission.sync');
         });
     }
 

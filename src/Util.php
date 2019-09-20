@@ -51,10 +51,20 @@ class Util
             }
             return false;
         }
-        $name = \Request::input($name);
-        $value = config("permission.role.group.values.$name");
+        $group = \Request::input($name);
+        $value = static::get_role_group_value($group);
 
-        if (!$value && !$name && !$required) return '';
+        return $value ? "$group:$value" : '';
+    }
+
+    public static function get_role_group_value($group)
+    {
+        $config = config("permission.role.group");
+
+        $required = $config['required'] ?? false;
+        $value = $config['values'][$group] ?? '';
+
+        if (!$value && !$group && !$required) return '';
 
         $isHeader = $value && $value{0} === '^';
         if ($isHeader) $value = substr($value, 1);
@@ -62,7 +72,8 @@ class Util
         if (!$value || ($isHeader && !\Request::header($value)) || !\Request::has($value)) {
             throw new \Exception('role group value required.');
         }
-        return "$name:" . ($isHeader ? \Request::header($value) : \Request::input($value));
+
+        return $isHeader ? \Request::header($value) : \Request::input($value);
     }
 
     public static function parse_role_group($group)

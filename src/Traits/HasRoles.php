@@ -70,11 +70,11 @@ trait HasRoles
             if ($this->hasRole($role)) {
                 throw new \Exception('role already exists');
             }
-            if (!Auth::hasUser() || !Auth::user()->hasRoleGroup($role->group)) {
-                throw new \Exception('no permission operation.');
-            }
+//            if (!Auth::hasUser() || !Auth::user()->hasRoleGroup($role->group)) {
+//                throw new \Exception('no permission operation.');
+//            }
         })->each(function ($role) {
-            \DB::table('user_has_roles')->insert(['user_id' => $this->id, 'role_id' => $role->id, 'group' => $role->group]);
+            \DB::table('user_has_roles')->insert(['user_id' => $this->id, 'role_id' => $role->id, 'group' => $this->makeRoleGroup($role)]);
             $this->roles()->push($role);
         });
         return $this->clearPermissionCache()->unsetRelation('permissions');
@@ -171,5 +171,16 @@ trait HasRoles
     protected function getRelationKey($key, $group)
     {
         return $group !== false ? $key . '_' . str_replace(':', '_', $group) : $key;
+    }
+
+    protected function makeRoleGroup($role)
+    {
+        $group = Util::parse_role_group($role->group);
+
+        if (!$group['key']) return null;
+
+        if ($group['value'] === null) return Util::get_role_group_value($group['key']);
+
+        return $role->group;
     }
 }

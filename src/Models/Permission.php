@@ -15,6 +15,13 @@ class Permission extends Model
         'content' => 'json'
     ];
 
+    public static function queryWithLang(string $lang)
+    {
+        return parent::query()->leftJoin('permission_translations', function ($join) use ($lang) {
+            $join->on('permission_translations.name', 'permissions.name')->on('lang', $lang);
+        })->select('permissions.*', 'permission_translations.content as translate');
+    }
+
     public static function findById(int $id, $group = false)
     {
         if ($group === false) {

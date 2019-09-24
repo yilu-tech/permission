@@ -19,7 +19,9 @@ class RoleController
             ->select('roles.*', \DB::raw('group_concat(child_id separator ",") as child_keys'))
             ->groupBy('id');
         if (($group = Util::get_query_role_group()) !== false) {
-            $query->where('group', $group);
+            $query->where(function ($query) use ($group) {
+                $query->where('group', $group)->orWhere('group', \Request::input('group'));
+            });
         }
         return $query->get()->each(function ($item) {
             $item->child_keys = $item->child_keys ? explode(',', $item->child_keys) : [];

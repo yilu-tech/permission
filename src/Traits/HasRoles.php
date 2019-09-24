@@ -177,7 +177,7 @@ trait HasRoles
     {
         $group = Util::parse_role_group($role->group);
 
-        if (!$group['key']) return null;
+        if (!$group['key']) return '';
 
         if ($group['value'] === null) return Util::get_role_group_value($group['key']);
 

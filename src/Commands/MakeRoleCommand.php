@@ -14,7 +14,7 @@ class MakeRoleCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'make:role {name} {--admin} {--group=}';
+    protected $signature = 'make:role {name} {--admin} {--sys} {--extendable} {--group=} {--alias=}';
 
     /**
      * The console command description.
@@ -31,21 +31,32 @@ class MakeRoleCommand extends Command
     public function handle()
     {
         $role['name'] = $this->argument('name');
+        $role['alias'] = $this->option('alias');
         $role['group'] = $this->option('group');
+        $role['status'] = 0;
 
         if ($this->option('admin')) {
             if ($this->adminExists($role['group'])) {
                 $this->info('make error: group admin exists.');
                 return;
             }
-            $role['child_length'] = -1;
+            $role['status'] = $role['status'] | RS_ADMIN;
         }
+
+        if ($this->option('sys')) {
+            $role['status'] = $role['status'] | RS_SYS;
+        }
+
+        if ($this->option('extendable')) {
+            $role['status'] = $role['status'] | RS_EXTENDABLE;
+        }
+
         $role = Role::create($role);
         $this->info("make success: role id {$role->id} .");
     }
 
     protected function adminExists($group = null)
     {
-        return Role::query()->where('child_length', -1)->where('group', $group)->exists();
+        return Role::query()->where('status', '&', RS_ADMIN)->where('group', $group)->exists();
     }
 }

@@ -13,7 +13,7 @@ class Role extends Model
 
     protected $table = 'roles';
 
-    protected $fillable = ['id', 'name', 'group', 'config', 'description', 'child_length'];
+    protected $fillable = ['id', 'name', 'alias', 'group', 'status', 'config', 'description'];
 
     protected $casts = [
         'config' => 'json',
@@ -24,7 +24,9 @@ class Role extends Model
         if ($group === false) {
             return static::query()->find($id);
         }
-        return static::query()->where('group', $group)->find($id);
+        return static::query()->where(function ($query) use ($group) {
+            $query->where('group', $group)->orWhere('group', strstr($group, ':', true));
+        })->find($id);
     }
 
     public static function findByName(string $name)
@@ -34,7 +36,7 @@ class Role extends Model
 
     public function isAdministrator()
     {
-        return $this->getAttribute('child_length') == -1;
+        return $this->status & RS_ADMIN;
     }
 
     public function groupInfo()

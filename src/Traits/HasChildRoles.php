@@ -103,14 +103,17 @@ trait HasChildRoles
             if ($role->isAdministrator()) {
                 throw new \Exception('can not extend administrator');
             }
+            if (!($role & RS_EXTENDABLE)) {
+                throw new \Exception("can not extend role<{$role->name}>");
+            }
             if ($this->hasChildRole($role)) {
-                throw new \Exception('role already exists');
+                throw new \Exception("role<{$role->name}> already exists");
             }
             if ($role->hasChildRole($this)) {
                 throw new \Exception('can not extend parent');
             }
             if ($role->getLevel() >= $this->MAX_LEVEL) {
-                throw new \Exception('can not extend role more than 3 level');
+                throw new \Exception("can not extend role<{$role->name}> more than {$this->MAX_LEVEL} level");
             }
         })->each(function ($role) {
             \DB::table('role_has_roles')->insert(['role_id' => $this->id, 'child_id' => $role->id]);
@@ -150,7 +153,7 @@ trait HasChildRoles
 
     protected function hasChild()
     {
-        return $this->getOriginal('child_length', 0) > 0;
+        return $this->getOriginal('status') & RS_EXTENDED;
     }
 
     protected function getStoredRole($role, $group = false)

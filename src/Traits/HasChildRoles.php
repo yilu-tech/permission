@@ -103,7 +103,7 @@ trait HasChildRoles
             if ($role->isAdministrator()) {
                 throw new \Exception('can not extend administrator');
             }
-            if (!($role & RS_EXTENDABLE)) {
+            if (!($role->status & RS_EXTENDABLE)) {
                 throw new \Exception("can not extend role<{$role->name}>");
             }
             if ($this->hasChildRole($role)) {
@@ -156,17 +156,17 @@ trait HasChildRoles
         return $this->getOriginal('status') & RS_EXTENDED;
     }
 
-    protected function getStoredRole($role, $group = false)
+    protected function getStoredRole($role)
     {
         if (is_array($role)) {
             return array_map([$this, 'getStoredRole'], $role);
         }
         if (is_numeric($role)) {
-            $role = Role::findById($role, $group);
+            $role = Role::findById($role);
         }
-        if (!($role instanceof Role) || ($group !== false && $role->group != $group)) {
-            throw new \Exception('role not exists');
+        if ($role instanceof Role && ($role->group === $this->group || $role->group === strstr($this->group, ':', true))) {
+            return $role;
         }
-        return $role;
+        throw new \Exception('role not exists');
     }
 }

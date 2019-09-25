@@ -74,14 +74,18 @@ class RoleController
         $role = Role::findById(\Request::input('role_id'), Util::get_query_role_group());
         if (!$role) throw new \Exception('role not found');
 
-        return \DB::transaction(function () use ($role) {
-            $data = \Request::only(['name', 'description', 'config']);
-            $data['status'] = $role->status & ~RS_EXTENDED;
-            if (count($roles = \Request::input('roles', []))) {
-                $data['status'] = $data['status'] | RS_EXTENDED;
-            }
-            $role->update($data);
+        $data = \Request::only(['name', 'description', 'config']);
+        $data['status'] = $role->status & ~RS_EXTENDED;
 
+        if (count($roles = \Request::input('roles', []))) {
+            if ($data['status'] & RS_SYS) {
+                throw new \Exception('system role can not extend other role.');
+            }
+            $data['status'] = $data['status'] | RS_EXTENDED;
+        }
+
+        return \DB::transaction(function () use ($role, $data, $roles) {
+            $role->update($data);
             if ($data['status'] & RS_EXTENDED) {
                 $role->syncChildRoles($roles);
             }
@@ -99,7 +103,7 @@ class RoleController
         $role = Role::findById(\Request::input('role_id'), Util::get_query_role_group());
         if (!$role) throw new \Exception('role not found');
 
-        if ($role->staus & RS_SYS) {
+        if ($role->status & RS_SYS) {
             throw new \Exception('can not remove');
         }
 

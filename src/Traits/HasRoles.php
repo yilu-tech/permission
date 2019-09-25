@@ -66,8 +66,8 @@ trait HasRoles
         }
         collect($roles)->map(function ($role) use ($group) {
             return $this->getStoredRole($role, $group);
-        })->each(function ($role) {
-            if ($this->hasRole($role)) {
+        })->each(function ($role) use ($group) {
+            if ($this->hasRole($role, $group)) {
                 throw new \Exception("role<{$role->name}> already exists");
             }
 //            if (!Auth::hasUser() || !Auth::user()->hasRoleGroup($role->group)) {
@@ -108,9 +108,9 @@ trait HasRoles
             ->unsetRelation($this->getRelationKey('permissions', $group));
     }
 
-    public function hasRole($role): bool
+    public function hasRole($role, $group = false): bool
     {
-        return $this->roles()->flatMap(function ($role) {
+        return $this->roles($group)->flatMap(function ($role) {
             if (array_key_exists(HasChildRoles::class, class_uses($role))) {
                 return $role->allChildRoles()->push($role);
             }
@@ -118,23 +118,23 @@ trait HasRoles
         })->contains('id', $this->getStoredRole($role)->id);
     }
 
-    public function hasAnyRoles($roles): bool
+    public function hasAnyRoles($roles, $group = false): bool
     {
         foreach ($roles as $role) {
-            if ($this->hasRole($role)) {
+            if ($this->hasRole($role, $group)) {
                 return true;
             }
         }
         return false;
     }
 
-    public function hasAllRoles($roles = null)
+    public function hasAllRoles($roles = null, $group = false)
     {
         if (!$roles) {
             return method_exists($this, 'isAdministrator') && $this->isAdministrator();
         }
         foreach ($roles as $role) {
-            if (!$this->hasRole($role)) {
+            if (!$this->hasRole($role, $group)) {
                 return false;
             }
         }
@@ -160,10 +160,10 @@ trait HasRoles
             return array_map([$this, 'getStoredRole'], $role);
         }
         if (is_numeric($role)) {
-            $role = Role::findById($role, $group);
+            $role = Role::findById($role);
         }
-        if (!($role instanceof Role) || ($group !== false && $role->group != $group)) {
-            throw new \Exception('role not exists');
+        if ($role instanceof Role && ($group === false || $role->group === $group || $role->group === strstr($group, ':', true))) {
+            return $role;
         }
         return $role;
     }
@@ -179,7 +179,7 @@ trait HasRoles
 
         if (!$group['key']) return '';
 
-        if ($group['value'] === null) return Util::get_role_group_value($group['key']);
+        if ($group['value'] === null) return $group['key'] . ':' . Util::get_role_group_value($group['key']);
 
         return $role->group;
     }

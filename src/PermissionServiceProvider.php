@@ -15,6 +15,12 @@ class PermissionServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        define('RS_SYS', 1);
+        define('RS_ADMIN', 2);
+        define('RS_EXTENDABLE', 4);
+        define('RS_EXTENDED', 8);
+        define('RS_DISABLED', 16);
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__ . '/../database/migrations' => database_path('migrations'),

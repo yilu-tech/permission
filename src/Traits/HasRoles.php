@@ -68,7 +68,7 @@ trait HasRoles
             return $this->getStoredRole($role, $group);
         })->each(function ($role) {
             if ($this->hasRole($role)) {
-                throw new \Exception('role already exists');
+                throw new \Exception("role<{$role->name}> already exists");
             }
 //            if (!Auth::hasUser() || !Auth::user()->hasRoleGroup($role->group)) {
 //                throw new \Exception('no permission operation.');

@@ -44,13 +44,16 @@ class RoleController
         }
 
         return \DB::transaction(function () use ($data) {
-            $data['child_length'] = count($roles = \Request::input('roles', []));
+            if (count($roles = \Request::input('roles', []))) {
+                $data['status'] = RS_EXTENDABLE | RS_EXTENDED;
+            } else {
+                $data['status'] = RS_EXTENDABLE;
+            }
             $role = Role::create($data);
 
-            if ($data['child_length']) {
+            if ($data['status'] & RS_EXTENDED) {
                 $role->giveChildRoleTo($roles);
             }
-
             if (count($permissions = \Request::input('permissions', []))) {
                 $role->givePermissionTo($permissions);
             }
@@ -73,9 +76,13 @@ class RoleController
 
         return \DB::transaction(function () use ($role) {
             $data = \Request::only(['name', 'description', 'config']);
-            $data['child_length'] = count($roles = \Request::input('roles', []));
+            $data['status'] = $role->status & ~RS_EXTENDED;
+            if (count($roles = \Request::input('roles', []))) {
+                $data['status'] = $data['status'] | RS_EXTENDED;
+            }
             $role->update($data);
-            if ($data['child_length']) {
+
+            if ($data['status'] & RS_EXTENDED) {
                 $role->syncChildRoles($roles);
             }
             if (count($permissions = \Request::input('permissions', []))) {
@@ -91,6 +98,10 @@ class RoleController
 
         $role = Role::findById(\Request::input('role_id'), Util::get_query_role_group());
         if (!$role) throw new \Exception('role not found');
+
+        if ($role->staus & RS_SYS) {
+            throw new \Exception('can not remove');
+        }
 
         return \DB::transaction(function () use ($role) {
             \DB::table('role_has_roles')->where('role_id', $role->id)->orWhere('child_id', $role->id)->delete();

@@ -24,6 +24,9 @@ class RoutePermission
     public function getRoutes()
     {
         $routes = [];
+
+        $type = 'api';
+
         foreach (app()->router->getRoutes() as $route) {
             $name = $this->getName($route);
 
@@ -47,7 +50,7 @@ class RoutePermission
             $path = $this->getUri($route);
             $method = $this->getMethod($route);
 
-            $routes[] = compact('name', 'method', 'path', 'auth', 'rbac_ignore');
+            $routes[] = compact('name', 'type', 'method', 'path', 'auth', 'rbac_ignore');
         }
         return $routes;
     }

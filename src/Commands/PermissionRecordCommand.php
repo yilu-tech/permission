@@ -40,7 +40,6 @@ class PermissionRecordCommand extends BasePermissionCommand
             $changes = $this->getChanges($new, $old);
             $this->syncFile($old, $changes);
         }
-
         $this->info('record ' . count($changes) . ' changes.');
     }
 

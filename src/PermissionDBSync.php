@@ -82,7 +82,7 @@ class PermissionDBSync
             foreach ((array)$change['auth'] as $item) {
                 $groups = explode(',', $item);
                 $auth = array_shift($groups);
-                if ($auth == $this->auth) {
+                if (!$this->auth || $auth == $this->auth) {
                     $callback($change, count($groups) ? $groups : [null]);
                 }
             }
@@ -92,7 +92,7 @@ class PermissionDBSync
     protected function createChange($change, $groups)
     {
         foreach ($groups as $group) {
-            Permission::create(array_merge(['name' => $change['name'], 'group' => $group], $this->getPermissionData($change)));
+            Permission::create(array_merge(['name' => $change['name'], 'type' => $change['type'], 'group' => $group], $this->getPermissionData($change)));
         }
     }
 
@@ -104,7 +104,7 @@ class PermissionDBSync
                 $row->update($this->getPermissionData($change));
                 $row->flag = true;
             } else {
-                Permission::create(array_merge(['name' => $change['name'], 'group' => $group], $this->getPermissionData($change)));
+                Permission::create(array_merge(['name' => $change['name'], 'type' => $change['type'], 'group' => $group], $this->getPermissionData($change)));
             }
         }
         foreach ($rows as $row) if (!$row->flag) $row->delete();

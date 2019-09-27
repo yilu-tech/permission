@@ -28,26 +28,26 @@ class PermissionListCommand extends BasePermissionCommand
     public function handle()
     {
         if ($this->option('stored')) {
-            return $this->outputTable(['name', 'method', 'path', 'auth', 'rbac_ignore'], $this->getStored());
+            return $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore'], $this->getStored());
         }
 
         if ($this->option('last')) {
-            return $this->outputTable(['name', 'method', 'path', 'auth', 'rbac_ignore'], $this->getLastStored());
+            return $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore'], $this->getLastStored());
         }
 
         if ($this->option('changed')) {
-            return $this->outputTable(['name', 'method', 'path', 'auth', 'rbac_ignore', 'action', 'changes'], $this->getChanged());
+            return $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore', 'action', 'changes'], $this->getChanged());
         }
 
         if ($this->option('changes')) {
-            return $this->outputTable(['name', 'method', 'path', 'auth', 'rbac_ignore', 'action', 'changes'], $this->getChanges($this->getRoutePermission(), $this->getStored()));
+            return $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore', 'action', 'changes'], $this->getChanges($this->getRoutePermission(), $this->getStored()));
         }
 
         if ($this->option('merge-changes')) {
-            return $this->outputTable(['name', 'method', 'path', 'auth', 'rbac_ignore', 'action', 'changes'], $this->getChanges($this->getRoutePermission(), $this->getLastStored()));
+            return $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore', 'action', 'changes'], $this->getChanges($this->getRoutePermission(), $this->getLastStored()));
         }
 
-        $this->outputTable(['name', 'method', 'path', 'auth', 'rbac_ignore'], $this->getRoutePermission());
+        $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore'], $this->getRoutePermission());
     }
 
     protected function outputTable($headers, $rows)

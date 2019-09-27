@@ -13,7 +13,7 @@ class PermissionRollbackCommand extends BasePermissionCommand
      *
      * @var string
      */
-    protected $signature = 'permission:rollback {--path=} {--db}';
+    protected $signature = 'permission:rollback {--path=} {--db} {--auth=}';
 
     /**
      * The console command description.

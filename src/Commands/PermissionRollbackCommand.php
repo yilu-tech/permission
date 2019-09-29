@@ -13,7 +13,7 @@ class PermissionRollbackCommand extends BasePermissionCommand
      *
      * @var string
      */
-    protected $signature = 'permission:rollback {--path=} {--db} {--auth=}';
+    protected $signature = 'permission:rollback {--db} {--path=} {--auth=}';
 
     /**
      * The console command description.
@@ -29,12 +29,23 @@ class PermissionRollbackCommand extends BasePermissionCommand
      */
     public function handle()
     {
-        if ($count = count($changes = $this->getChanged())) {
+        $changes = $this->getChanged();
+        if ($synced = $this->isSyncChanges($changes)) {
+            array_shift($changes);
+        }
+
+        if ($count = count($changes)) {
             if ($this->option('db')) {
+                if (!$synced) {
+                    return $this->info('changes no commit.');
+                }
                 (new PermissionDBSync($this->option('auth')))->rollback($changes);
             } else {
-                $this->fileRollback();
+                if ($synced) {
+                    return $this->info('changes has been sync to database, please rollback with db.');
+                }
             }
+            $this->fileRollback();
             $this->info("rollback $count rows.");
         } else {
             $this->info('no permission to rollback.');

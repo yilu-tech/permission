@@ -103,7 +103,7 @@ trait HasChildRoles
             if ($role->isAdministrator()) {
                 throw new \Exception('can not extend administrator');
             }
-            if (!($role->status & RS_EXTENDABLE)) {
+            if (!($role->status & RS_EXTEND)) {
                 throw new \Exception("can not extend role<{$role->name}>");
             }
             if ($this->hasChildRole($role)) {
@@ -163,6 +163,8 @@ trait HasChildRoles
         }
         if (is_numeric($role)) {
             $role = Role::findById($role);
+        } elseif (is_string($role)) {
+            $role = Role::findByName($role);
         }
         if ($role instanceof Role && ($role->group === $this->group || $role->group === strstr($this->group, ':', true))) {
             return $role;

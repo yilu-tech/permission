@@ -11,7 +11,7 @@ class PermissionListCommand extends BasePermissionCommand
      *
      * @var string
      */
-    protected $signature = 'permission:list {--stored} {--last} {--changes} {--changed} {--merge-changes} {--path=}';
+    protected $signature = 'permission:list {--stored} {--last} {--changes} {--changed} {--path=}';
 
     /**
      * The console command description.
@@ -36,15 +36,15 @@ class PermissionListCommand extends BasePermissionCommand
         }
 
         if ($this->option('changed')) {
-            return $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore', 'action', 'changes'], $this->getChanged());
+            $changes = $this->getChanged();
+            if ($this->isSyncChanges($changes)) {
+                array_shift($changes);
+            }
+            return $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore', 'action', 'changes'], $changes);
         }
 
         if ($this->option('changes')) {
             return $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore', 'action', 'changes'], $this->getChanges($this->getRoutePermission(), $this->getStored()));
-        }
-
-        if ($this->option('merge-changes')) {
-            return $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore', 'action', 'changes'], $this->getChanges($this->getRoutePermission(), $this->getLastStored()));
         }
 
         $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore'], $this->getRoutePermission());

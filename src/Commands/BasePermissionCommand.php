@@ -94,6 +94,11 @@ class BasePermissionCommand extends Command
         return [];
     }
 
+    protected function isSyncChanges(array $changes)
+    {
+        return current($changes) === 'changed';
+    }
+
     protected function getPath(string $name = '')
     {
         $path = $this->option('path') ?: config('permission.migration_path');

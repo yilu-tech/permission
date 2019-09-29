@@ -21,17 +21,30 @@ class Role extends Model
 
     public static function findById(int $id, $group = false)
     {
-        if ($group === false) {
-            return static::query()->find($id);
-        }
-        return static::query()->where(function ($query) use ($group) {
-            $query->where('group', $group)->orWhere('group', strstr($group, ':', true));
-        })->find($id);
+        return static::group($group)->find($id);
     }
 
-    public static function findByName(string $name)
+    public static function findByName(string $name, $group = false)
     {
-        return static::query()->where('name', $name)->first();
+        return static::group($group)->where('alias', $name)->first();
+    }
+
+    public static function status($status, $group = false)
+    {
+        return static::group($group)->where('roles.status', '&', $status);
+    }
+
+    public static function group($group)
+    {
+        if ($group === false) {
+            return static::query();
+        }
+        if (!$group) {
+            return static::query()->whereNull('roles.group');
+        }
+        return static::query()->where(function ($query) use ($group) {
+            $query->where('roles.group', $group)->orWhere('roles.group', strstr($group, ':', true));
+        });
     }
 
     public function isAdministrator()

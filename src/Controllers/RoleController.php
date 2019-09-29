@@ -15,17 +15,12 @@ class RoleController
 {
     public function list()
     {
-        $query = Role::query()->leftJoin('role_has_roles', 'role_has_roles.role_id', 'roles.id')
+        return Role::status(RS_READ, Util::get_query_role_group())
+            ->leftJoin('role_has_roles', 'role_has_roles.role_id', 'roles.id')
             ->select('roles.*', \DB::raw('group_concat(child_id separator ",") as child_keys'))
-            ->groupBy('id');
-        if (($group = Util::get_query_role_group()) !== false) {
-            $query->where(function ($query) use ($group) {
-                $query->where('group', $group)->orWhere('group', \Request::input('group'));
+            ->groupBy('id')->each(function ($item) {
+                $item->child_keys = $item->child_keys ? explode(',', $item->child_keys) : [];
             });
-        }
-        return $query->get()->each(function ($item) {
-            $item->child_keys = $item->child_keys ? explode(',', $item->child_keys) : [];
-        });
     }
 
     public function create()
@@ -44,10 +39,9 @@ class RoleController
         }
 
         return \DB::transaction(function () use ($data) {
+            $data['status'] = RS_EXTEND | RS_READ;
             if (count($roles = \Request::input('roles', []))) {
-                $data['status'] = RS_EXTENDABLE | RS_EXTENDED;
-            } else {
-                $data['status'] = RS_EXTENDABLE;
+                $data['status'] = $data['status'] | RS_EXTENDED;
             }
             $role = Role::create($data);
 

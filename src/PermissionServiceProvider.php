@@ -15,11 +15,13 @@ class PermissionServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        define('RS_SYS', 1);
-        define('RS_ADMIN', 2);
-        define('RS_EXTENDABLE', 4);
-        define('RS_EXTENDED', 8);
-        define('RS_DISABLED', 16);
+        define('RS_ADMIN', 1);
+        define('RS_BASICS', 2);
+        define('RS_SYS', 4);
+        define('RS_READ', 8);
+        define('RS_EXTEND', 16);
+        define('RS_EXTENDED', 32);
+        define('RS_DISABLED', 64);
 
         if ($this->app->runningInConsole()) {
             $this->publishes([

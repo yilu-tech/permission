@@ -14,7 +14,7 @@ class MakeRoleCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'make:role {name} {--a|admin} {--s|sys} {--e|extend} {--b|basics} {--r|read} {--g|group=} {--A|alias=}';
+    protected $signature = 'make:role {name} {--a|admin} {--s|sys} {--e|extend} {--b|basics} {--r|read} {--G|group=} {--A|alias=}';
 
     /**
      * The console command description.

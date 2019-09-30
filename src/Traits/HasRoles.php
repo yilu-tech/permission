@@ -20,19 +20,21 @@ trait HasRoles
      */
     public function roles($group = false)
     {
-        return Util::array_get($this->relations, $this->getRelationKey('roles', $group), function () use ($group) {
-            $query = \DB::table('user_has_roles')
+        $roles = Util::array_get($this->relations, 'roles', function () {
+            return \DB::table('user_has_roles')
                 ->leftJoin('roles', 'roles.id', 'user_has_roles.role_id')
                 ->where('user_id', '=', $this->id)
-                ->select('roles.*', 'user_has_roles.group');
-            if ($group !== false) {
-                $query->where('user_has_roles.group', $group);
-            }
-            $basics = Role::status(RS_BASICS, $group)->get();
-            return $query->get()->map(function ($item) {
-                return new Role((array)$item);
-            })->merge($basics);
+                ->get(['roles.*', 'user_has_roles.group'])
+                ->map(function ($item) {
+                    return new Role((array)$item);
+                });
         });
+        if ($group !== false) {
+            $roles = $roles->filter(function ($role) use ($group) {
+                return $role->group == $group;
+            })->values();
+        }
+        return $roles;
     }
 
     /**
@@ -41,10 +43,14 @@ trait HasRoles
      */
     public function permissions($group = false)
     {
-        return Util::array_get($this->relations, $this->getRelationKey('permissions', $group), function () use ($group) {
-            return $this->relations['permissions'] = $this->roles($group)->flatMap(function ($role) {
+        if (!isset($this->relations['permissions'])) {
+            $this->relations['permissions'] = [];
+        }
+        $groupName = $group === false ? '0' : $group;
+        return Util::array_get($this->relations['permissions'], $groupName, function () use ($group) {
+            return $this->roles($group)->flatMap(function ($role) {
                 return $role->permissions();
-            })->unique('id');
+            })->unique('id')->values();
         });
     }
 
@@ -65,14 +71,29 @@ trait HasRoles
         return $this->id == Auth::id();
     }
 
-    public function giveRoleTo($roles, $group = false)
+    public function giveBasicsRoles($group = false, $fireEvent = true)
+    {
+        Role::status(RS_BASICS, $group)->get()->each(function ($role) {
+            $row = ['user_id' => $this->id, 'role_id' => $role->id, 'group' => $this->makeRoleGroup($role)];
+            if (!\DB::table('user_has_roles')->where($row)->exists()) {
+                \DB::table('user_has_roles')->insert($row);
+            }
+        });
+        if ($fireEvent) {
+            $this->clearPermissionCache()->fireModelEvent('roleChanged');
+        }
+        return $this;
+    }
+
+    public function giveRoleTo($roles, $group = false, $basics = false)
     {
         if ($this->checkAuthorizer()) {
             throw new \Exception('can not give role to self.');
         }
-        collect($roles)->map(function ($role) use ($group) {
+        $roles = $basics ? Role::status(RS_BASICS, $group)->get()->merge($roles) : collect($roles);
+        $roles->map(function ($role) use ($group) {
             $role = $this->getStoredRole($role, $group);
-            if ($role->status & RS_BASICS || $this->hasRole($role, $group)) {
+            if ($this->hasRole($role, $group)) {
                 throw new \Exception("role<{$role->name}> already exists");
             }
             return $role;
@@ -81,13 +102,13 @@ trait HasRoles
             $this->roles()->push($role);
         });
 
-        $this->fireModelEvent('roleChanged')->clearPermissionCache();
+        $this->clearPermissionCache()->fireModelEvent('roleChanged');
         return $this->unsetRelation('permissions');
     }
 
-    public function syncRoles($roles, $group = false)
+    public function syncRoles($roles, $group = false, $basics = false)
     {
-        return $this->revokeRoleTo(null, $group, false)->giveRoleTo($roles, $group);
+        return $this->revokeRoleTo(null, $group, false)->giveRoleTo($roles, $group, $basics);
     }
 
     public function revokeRoleTo($roles = null, $group = false, $fireEvent = true)
@@ -103,17 +124,10 @@ trait HasRoles
             $query->where('group', $group);
         }
         $query->delete();
-
-        $roles = $roles ? $this->roles()->diffUsing($roles, function ($a, $b) {
-            return $a->id == $b->id ? 0 : -1;
-        }) : collect([]);
-
         if ($fireEvent) {
-            $this->fireModelEvent('roleChanged')->clearPermissionCache();
+            $this->clearPermissionCache()->fireModelEvent('roleChanged');
         }
-
-        return $this->setRelation($this->getRelationKey('roles', $group), $roles)
-            ->unsetRelation($this->getRelationKey('permissions', $group));
+        return $this->unsetRelation('roles')->unsetRelation('permissions');
     }
 
     public function hasRole($role, $group = false): bool

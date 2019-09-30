@@ -52,7 +52,7 @@ class MakeRoleCommand extends Command
         }
 
         if ($this->option('basics')) {
-            $role['status'] = $role['status'] | RS_BASICS;
+            $role['status'] = $role['status'] | RS_BASICS & ~RS_EXTEND;
         }
 
         if ($this->option('read')) {

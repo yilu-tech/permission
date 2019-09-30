@@ -21,15 +21,17 @@ trait HasRoles
     public function roles($group = false)
     {
         return Util::array_get($this->relations, $this->getRelationKey('roles', $group), function () use ($group) {
-            $query = \DB::table('user_has_roles')->leftJoin('roles', 'roles.id', 'user_has_roles.role_id')
+            $query = \DB::table('user_has_roles')
+                ->leftJoin('roles', 'roles.id', 'user_has_roles.role_id')
                 ->where('user_id', '=', $this->id)
-                ->select('roles.*', 'user_has_roles.*');
+                ->select('roles.*', 'user_has_roles.group');
             if ($group !== false) {
                 $query->where('user_has_roles.group', $group);
             }
+            $basics = Role::status(RS_BASICS, $group)->get();
             return $query->get()->map(function ($item) {
                 return new Role((array)$item);
-            });
+            })->merge($basics);
         });
     }
 
@@ -63,30 +65,14 @@ trait HasRoles
         return $this->id == Auth::id();
     }
 
-    public function giveBasicsRoles($group = false, $fireEvent = true)
-    {
-        Role::status(RS_BASICS, $group)->get()->each(function ($role) {
-            $row = ['user_id' => $this->id, 'role_id' => $role->id, 'group' => $this->makeRoleGroup($role)];
-            if (!\DB::table('user_has_roles')->where($row)->exists()) {
-                \DB::table('user_has_roles')->insert($row);
-            }
-        });
-        if ($fireEvent) {
-            $this->fireModelEvent('roleChanged')->clearPermissionCache();
-        }
-        return $this;
-    }
-
-    public function giveRoleTo($roles, $group = false, $basics = false)
+    public function giveRoleTo($roles, $group = false)
     {
         if ($this->checkAuthorizer()) {
             throw new \Exception('can not give role to self.');
         }
-
-        $roles = $basics ? Role::status(RS_BASICS, $group)->get()->merge($roles) : collect($roles);
-        $roles->map(function ($role) use ($group) {
+        collect($roles)->map(function ($role) use ($group) {
             $role = $this->getStoredRole($role, $group);
-            if ($this->hasRole($role, $group)) {
+            if ($role->status & RS_BASICS || $this->hasRole($role, $group)) {
                 throw new \Exception("role<{$role->name}> already exists");
             }
             return $role;
@@ -99,9 +85,9 @@ trait HasRoles
         return $this->unsetRelation('permissions');
     }
 
-    public function syncRoles($roles, $group = false, $basics = false)
+    public function syncRoles($roles, $group = false)
     {
-        return $this->revokeRoleTo(null, $group, false)->giveRoleTo($roles, $group, $basics);
+        return $this->revokeRoleTo(null, $group, false)->giveRoleTo($roles, $group);
     }
 
     public function revokeRoleTo($roles = null, $group = false, $fireEvent = true)

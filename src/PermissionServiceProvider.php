@@ -6,6 +6,14 @@ namespace YiluTech\Permission;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
+define('RS_ADMIN', 1);
+define('RS_BASICS', 2);
+define('RS_SYS', 4);
+define('RS_READ', 8);
+define('RS_EXTEND', 16);
+define('RS_EXTENDED', 32);
+define('RS_DISABLED', 64);
+
 class PermissionServiceProvider extends ServiceProvider
 {
     /**
@@ -15,14 +23,6 @@ class PermissionServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        define('RS_ADMIN', 1);
-        define('RS_BASICS', 2);
-        define('RS_SYS', 4);
-        define('RS_READ', 8);
-        define('RS_EXTEND', 16);
-        define('RS_EXTENDED', 32);
-        define('RS_DISABLED', 64);
-
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__ . '/../database/migrations' => database_path('migrations'),

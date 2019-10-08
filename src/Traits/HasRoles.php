@@ -71,44 +71,43 @@ trait HasRoles
         return $this->id == Auth::id();
     }
 
-    public function giveBasicsRoles($group = false, $fireEvent = true)
-    {
-        Role::status(RS_BASICS, $group)->get()->each(function ($role) {
-            $row = ['user_id' => $this->id, 'role_id' => $role->id, 'group' => $this->makeRoleGroup($role)];
-            if (!\DB::table('user_has_roles')->where($row)->exists()) {
-                \DB::table('user_has_roles')->insert($row);
-            }
-        });
-        if ($fireEvent) {
-            $this->clearPermissionCache()->fireModelEvent('roleChanged');
-        }
-        return $this;
-    }
-
-    public function giveRoleTo($roles, $group = false, $basics = false)
+    public function giveRoleTo($roles, $basics = false, $group = false, $fireEvent = true)
     {
         if ($this->checkAuthorizer()) {
             throw new \Exception('can not give role to self.');
         }
-        $roles = $basics ? Role::status(RS_BASICS, $group)->get()->merge($roles) : collect($roles);
-        $roles->map(function ($role) use ($group) {
-            $role = $this->getStoredRole($role, $group);
-            if ($this->hasRole($role, $group)) {
-                throw new \Exception("role<{$role->name}> already exists");
-            }
-            return $role;
-        })->unique('id')->each(function ($role) {
-            \DB::table('user_has_roles')->insert(['user_id' => $this->id, 'role_id' => $role->id, 'group' => $this->makeRoleGroup($role)]);
-            $this->roles()->push($role);
+
+        $roles = collect($roles)->map(function ($role) use ($group) {
+            return $this->getStoredRole($role, $group);
         });
 
-        $this->clearPermissionCache()->fireModelEvent('roleChanged');
+        if ($basics) {
+            $roles = $roles->merge(Role::status(RS_BASICS, $group)->get());
+        }
+
+        if (!$roles->count()) {
+            return $this;
+        }
+
+        $roles->unique('id')->each(function ($role) use ($group) {
+            if (!$this->hasRole($role, $group)) {
+                $role->group = $this->makeRoleGroup($role);
+
+                \DB::table('user_has_roles')->insert(['user_id' => $this->id, 'role_id' => $role->id, 'group' => $role->group]);
+
+                $this->roles()->push($role);
+            }
+        });
+
+        if ($fireEvent) {
+            $this->clearPermissionCache()->fireModelEvent('roleChanged');
+        }
         return $this->unsetRelation('permissions');
     }
 
-    public function syncRoles($roles, $group = false, $basics = false)
+    public function syncRoles($roles, $basics = false, $group = false)
     {
-        return $this->revokeRoleTo(null, $group, false)->giveRoleTo($roles, $group, $basics);
+        return $this->revokeRoleTo(null, $group, false)->giveRoleTo($roles, $basics, $group);
     }
 
     public function revokeRoleTo($roles = null, $group = false, $fireEvent = true)

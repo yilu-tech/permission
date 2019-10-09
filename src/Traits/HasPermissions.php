@@ -32,7 +32,7 @@ trait HasPermissions
     {
         return Util::array_get($this->relations, 'includePermissions', function () {
             if ($this->isAdministrator()) {
-                return Permission::query()->where('group', $this->groupInfo()['key']);
+                return Permission::query()->where('group', $this->groupInfo()['key'])->get();
             }
             return \DB::table('role_has_permissions')->leftJoin('permissions', 'permissions.id', 'role_has_permissions.permission_id')
                 ->where('role_id', '=', $this->id)->select('permissions.*', 'config')->get()->map(function ($item) {

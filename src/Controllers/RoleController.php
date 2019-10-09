@@ -18,7 +18,7 @@ class RoleController
         return Role::status(RS_READ, Util::get_query_role_group())
             ->leftJoin('role_has_roles', 'role_has_roles.role_id', 'roles.id')
             ->select('roles.*', \DB::raw('group_concat(child_id separator ",") as child_keys'))
-            ->groupBy('id')->each(function ($item) {
+            ->groupBy('id')->get()->each(function ($item) {
                 $item->child_keys = $item->child_keys ? explode(',', $item->child_keys) : [];
             });
     }

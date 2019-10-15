@@ -28,8 +28,7 @@ class PermissionCache
     protected function getDriver()
     {
         if (!$this->driver) {
-            $this->driver = Redis::connection();
-            $this->driver->getOptions()->prefix->setPrefix($this->getCachePrefix());
+            $this->driver = new CacheDriver(['prefix' => $this->prefix]);
         }
         return $this->driver;
     }

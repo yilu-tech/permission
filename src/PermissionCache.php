@@ -3,16 +3,12 @@
 
 namespace YiluTech\Permission;
 
-use Illuminate\Support\Facades\Redis;
-
 class PermissionCache
 {
     /**
      * @var \Illuminate\Database\Eloquent\Model
      */
     protected $user;
-
-    protected $prefix;
 
     protected $expire;
 
@@ -21,14 +17,13 @@ class PermissionCache
     public function __construct($user)
     {
         $this->user = $user;
-        $this->prefix = config('permission.cache.prefix') ?: 'permission';
         $this->expire = config('permission.cache.expire');
     }
 
     protected function getDriver()
     {
         if (!$this->driver) {
-            $this->driver = new CacheDriver(['prefix' => $this->prefix]);
+            $this->driver = new CacheDriver(['prefix' => $this->getCachePrefix()]);
         }
         return $this->driver;
     }
@@ -67,7 +62,8 @@ class PermissionCache
 
     public function getCachePrefix()
     {
-        return $this->prefix . ':' . $this->user->id . ':';
+        $prefix = config('permission.cache.prefix') ?: 'permission';
+        return $prefix . ':' . $this->user->id;
     }
 
     protected function getCacheValue()

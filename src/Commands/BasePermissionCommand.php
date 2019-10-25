@@ -7,8 +7,7 @@ namespace YiluTech\Permission\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Arr;
-use League\Flysystem\Util;
-use YiluTech\Permission\RoutePermission;
+use YiluTech\Permission\PermissionManager;
 
 class BasePermissionCommand extends Command
 {
@@ -17,100 +16,33 @@ class BasePermissionCommand extends Command
      */
     protected $file;
 
-    public function __construct(Filesystem $filesystem)
+    protected $manager;
+
+    public function __construct(Filesystem $filesystem, PermissionManager $permissionManager)
     {
         parent::__construct();
 
         $this->file = $filesystem;
+
+        $this->manager = $permissionManager;
     }
 
-    protected function getRoutePermission()
+    protected function write($changes, $items = null)
     {
-        $items = [];
-        foreach (RoutePermission::all() as $item) {
-            $items[$item['name']] = $item;
+        if ($items === null) {
+            $items = $this->manager->all();
         }
-        return $items;
-    }
-
-    protected function getChanges($new, $old)
-    {
-        $differ = function ($a, $b) {
-            return $a == $b ? 0 : 1;
-        };
-        $changes = [];
-        foreach (array_udiff_assoc($new, $old, $differ) as $key => $item) {
-            if (isset($old[$key])) {
-                $item['action'] = 'update';
-                $item['changes'] = array_udiff_assoc($old[$key], $item, $differ);
-            } else {
-                $item['action'] = 'create';
-            }
-            $changes[$key] = $item;
+        $path = $this->option('path');
+        if (empty($changes)) {
+            $this->file->delete($this->manager->getChangesFilePath($path));
+        } else {
+            $this->writeToFile($this->manager->getChangesFilePath($path), $changes);
         }
-        foreach (array_udiff_assoc($old, $new, $differ) as $key => $item) {
-            if (empty($new[$key])) {
-                $item['action'] = 'delete';
-                $changes[$key] = $item;
-            }
-        }
-        return $changes;
+        $this->writeToFile($this->manager->getStoredFilePath($path), $items);
     }
 
-    protected function getLastStored()
+    protected function writeToFile($path, $items)
     {
-        $items = $this->getStored();
-        foreach ($this->getChanged() as $key => $value) {
-            if ($value['action'] === 'create') {
-                unset($items[$key]);
-            } else {
-                if ($value['action'] === 'update') {
-                    $value = array_merge($value, $value['changes']);
-                    unset($value['changes']);
-                }
-                unset($value['action']);
-
-                $items[$key] = $value;
-            }
-        }
-        return $items;
-    }
-
-    protected function getStored()
-    {
-        $path = $this->getPath("permissions.php");
-        if ($this->file->isFile($path)) {
-            return require $path;
-        }
-        return [];
-    }
-
-    protected function getChanged()
-    {
-        $path = $this->getPath('changes.php');
-        if ($this->file->isFile($path)) {
-            return require $path;
-        }
-        return [];
-    }
-
-    protected function isSyncChanges(array $changes)
-    {
-        return current($changes) === 'changed';
-    }
-
-    protected function getPath(string $name = '')
-    {
-        $path = $this->option('path') ?: config('permission.migration_path');
-        if ($name) {
-            $path .= '/' . $name;
-        }
-        return base_path($path);
-    }
-
-    protected function write($path, $items)
-    {
-        $path = Util::normalizePath($path);
         $fd = fopen($path, 'w+');
         fwrite($fd, $this->arrayToString($items));
         fclose($fd);

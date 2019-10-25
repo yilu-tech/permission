@@ -3,9 +3,9 @@
 namespace YiluTech\Permission\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use YiluTech\Permission\Helper\RoleGroup;
 use YiluTech\Permission\Traits\HasChildRoles;
 use YiluTech\Permission\Traits\HasPermissions;
-use YiluTech\Permission\Util;
 
 class Role extends Model
 {
@@ -52,9 +52,13 @@ class Role extends Model
         return $this->status & RS_ADMIN;
     }
 
-    public function groupInfo()
+    public function groupInfo($name = null)
     {
-        return Util::parse_role_group($this->getAttribute('group'));
+        $info = RoleGroup::parse($this->getAttribute('group'));
+        if ($info['scope'] === null) {
+            $info['scope'] = RoleGroup::scope($info['key']);
+        }
+        return $name ? $info[$name] : $info;
     }
 
     public function users()

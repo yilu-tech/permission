@@ -2,7 +2,7 @@
 
 namespace YiluTech\Permission\Traits;
 
-use YiluTech\Permission\Util;
+use YiluTech\Permission\Helper\Helper;
 use YiluTech\Permission\Models\Permission;
 
 trait HasPermissions
@@ -12,7 +12,7 @@ trait HasPermissions
      */
     public function permissions()
     {
-        return Util::array_get($this->relations, 'permissions', function () {
+        return Helper::array_get($this->relations, 'permissions', function () {
             $permissions = $this->includePermissions();
 
             if (array_key_exists(HasChildRoles::class, class_uses($this))) {
@@ -30,14 +30,17 @@ trait HasPermissions
      */
     public function includePermissions()
     {
-        return Util::array_get($this->relations, 'includePermissions', function () {
+        return Helper::array_get($this->relations, 'includePermissions', function () {
             if ($this->isAdministrator()) {
-                return Permission::query()->where('group', $this->groupInfo()['key'])->get();
+                return Permission::query($this->getPermissionScope())->get();
             }
-            return \DB::table('role_has_permissions')->leftJoin('permissions', 'permissions.id', 'role_has_permissions.permission_id')
-                ->where('role_id', '=', $this->id)->select('permissions.*', 'config')->get()->map(function ($item) {
-                    return new Permission((array)$item);
-                });
+            $query = \DB::table('role_has_permissions')
+                ->leftJoin('permissions', 'permissions.id', 'role_has_permissions.permission_id')
+                ->where('role_id', '=', $this->id);
+
+            return Permission::query(false, null, $query)->addSelect('config')->get()->map(function ($item) {
+                return new Permission((array)$item);
+            });
         });
     }
 
@@ -77,7 +80,7 @@ trait HasPermissions
             return $this->getStoredPermission($permission);
         })->each(function ($permission) {
             if ($this->hasPermission($permission)) {
-                throw new \Exception('permission already exists');
+                throw new \Exception("permission<{$permission->name}> already exists");
             }
         })->each(function ($permission) {
             \DB::table('role_has_permissions')->insert(['role_id' => $this->id, 'permission_id' => $permission->id]);
@@ -106,6 +109,15 @@ trait HasPermissions
         return $this->unsetRelation('permissions');
     }
 
+    protected function getPermissionScope()
+    {
+        $info = $this->groupInfo();
+        if (!$info['scope']) {
+            return $info['key'];
+        }
+        return $info['key'] ? $info['scope'] . '.' . $info['key'] : $info['scope'];
+    }
+
     protected function getStoredPermission($permissions)
     {
         if (is_numeric($permissions)) {
@@ -115,9 +127,11 @@ trait HasPermissions
         } elseif (is_array($permissions)) {
             return array_map([$this, 'getStoredPermission'], $permissions);
         }
-
         if (!($permissions instanceof Permission)) {
-            throw new \Exception('permission not exists');
+            throw new \Exception('Permission not exists');
+        }
+        if (!in_array($this->getPermissionScope(), $permissions->scopes)) {
+            throw new \Exception('Permission not in role scope');
         }
         return $permissions;
     }

@@ -9,9 +9,7 @@
 namespace YiluTech\Permission\Controllers;
 
 use YiluTech\Permission\Models\Permission;
-use YiluTech\Permission\Models\PermissionTranslation;
 use YiluTech\Permission\Models\Role;
-use YiluTech\Permission\Util;
 
 class PermissionController
 {
@@ -20,30 +18,14 @@ class PermissionController
         if ($role_id = (int)\Request::input('role_id')) {
             $role = Role::findById($role_id);
             if (!$role) {
-                throw new \Exception('role not found');
+                throw new \Exception('Role not found');
             }
             if (\Request::has('with_child')) {
-                $permissions = $role->permissions();
-            } else {
-                $permissions = $role->includePermissions();
+                return $role->permissions();
             }
-        } else {
-            $query = Permission::query();
-            if (\Request::has('group')) {
-                $query->where('group', \Request::input('group'));
-            }
-            $permissions = $query->get();
+            return $role->includePermissions();
         }
-
-        $translations = PermissionTranslation::query()->where('lang', app()->getLocale())->get();
-        return $permissions->each(function ($item) use ($translations) {
-            foreach ($translations as $translation) {
-                if (Util::str_path_match($translation->name, $item->name)) {
-                    $item->translation = $translation->content;
-                    break;
-                }
-            }
-        });
+        return Permission::query(\Request::input('scope', false))->get();
     }
 
     public function create()
@@ -52,8 +34,8 @@ class PermissionController
         \Validator::make($attributes, [
             'name' => ['required', 'string', 'max:40', 'regex:/^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*$/', 'unique:permissions,name'],
             'type' => 'required|string|max:16',
-            'group' => 'nullable|string|max:16',
-            'context' => 'nullable|array'
+            'scopes' => 'array',
+            'content' => 'nullable|array'
         ])->validate();
         return Permission::query()->create($attributes);
     }
@@ -66,8 +48,8 @@ class PermissionController
         \Validator::make($attributes, [
             'name' => ['required', 'string', 'max:40', 'regex:/^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*$/', 'unique:permissions,name' . $attributes['id']],
             'type' => 'required|string|max:16',
-            'group' => 'nullable|string|max:16',
-            'context' => 'nullable|array'
+            'scopes' => 'array',
+            'content' => 'nullable|array'
         ])->validate();
         return $permission->save($attributes) ? 'success' : 'fail';
     }
@@ -76,7 +58,6 @@ class PermissionController
     {
         return \DB::translation(function () {
             Permission::query()->where('name', \Request::input('name'))->delete();
-            PermissionTranslation::query()->where('name', \Request::input('name'))->delete();
             return 'success';
         });
     }
@@ -87,22 +68,31 @@ class PermissionController
         \Validator::make($attributes, [
             'name' => ['required', 'string', 'max:40', 'regex:/^([a-zA-Z0-9]+|[*])(\.[a-zA-Z0-9]+)*$/'],
             'lang' => 'required|string|in:zh_CN,en',
-            'content' => 'required|string|max:64',
+            'content' => 'nullable|string|max:64',
             'description' => 'nullable|string|max:255'
         ])->validate();
-
-        $translation = PermissionTranslation::query()
-            ->where('name', $attributes['name'])
-            ->where('lang', $attributes['lang'])
-            ->first();
-        if ($translation) {
-            return $translation->update($attributes) ? 'success' : 'fail';
+        $permission = Permission::findByName(\Request::input('name'));
+        if (!$permission) {
+            throw new \Exception('Permission not found');
         }
-        return PermissionTranslation::query()->create($attributes);
-    }
+        $lang = \Request::input('lang');
+        $data = [
+            'name' => \Request::input('content'),
+            'desc' => \Request::input('description')
+        ];
 
-    public function removeTranslation()
-    {
-        return PermissionTranslation::query()->where('name', \Request::input('name'))->delete();
+        $translations = $permission->translations;
+
+        if ($data['name']) {
+            if ($translations) {
+                $translations[$lang] = $data;
+            } else {
+                $translations = [$lang => $data];
+            }
+        } else {
+            unset($translations[$lang]);
+        }
+        $permission->update(compact('translations'));
+        return 'success';
     }
 }

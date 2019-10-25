@@ -8,34 +8,36 @@ class Permission extends Model
 {
     protected $table = 'permissions';
 
-    protected $fillable = ['id', 'name', 'type', 'group', 'content'];
+    protected $fillable = ['name', 'type', 'scopes', 'content', 'translations'];
 
     protected $casts = [
         'config' => 'json',
-        'content' => 'json'
+        'content' => 'json',
+        'scopes' => 'json',
+        'translations' => 'json'
     ];
 
-    public static function queryWithLang(string $lang)
+    public static function query($scope = false, $lang = null, $query = null)
     {
-        return parent::query()->leftJoin('permission_translations', function ($join) use ($lang) {
-            $join->on('permission_translations.name', 'permissions.name')->on('lang', $lang);
-        })->select('permissions.*', 'permission_translations.content as translate');
+        if (!$query) {
+            $query = parent::query();
+        }
+        if ($scope) {
+            $query->whereRaw("JSON_SEARCH(`scopes`, 'one', '$scope') IS NOT NULL");
+        }
+        if (!$lang) {
+            $lang = app()->getLocale();
+        }
+        return $query->select('permissions.*', \DB::raw("JSON_EXTRACT(`translations`, '$.$lang') as translations"));
     }
 
-    public static function findById(int $id, $group = false)
+    public static function findById(int $id, $scope = false)
     {
-        if ($group === false) {
-            return static::query()->find($id);
-        }
-        return static::query()->where('group', $group)->find($id);
+        return static::query($scope)->find($id);
     }
 
-    public static function findByName(string $name, $group = false)
+    public static function findByName(string $name, $scope = false)
     {
-        $query = static::query()->where('name', $name);
-        if ($group !== false) {
-            $query->where('group', $group);
-        }
-        return $query->first();
+        return static::query($scope)->where('name', $name)->first();
     }
 }

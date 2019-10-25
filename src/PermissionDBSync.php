@@ -9,18 +9,10 @@ use YiluTech\Permission\Models\Permission;
 
 class PermissionDBSync
 {
-    protected $auth;
-
-    public function __construct($auth)
-    {
-        $this->auth = $auth;
-    }
-
     public static function runRequest($request)
     {
-        $self = new static($request->input('auth'));
+        $self = new static();
         $action = $request->input('action');
-
         return $self->{$action}($request->input('changes'));
     }
 
@@ -30,15 +22,15 @@ class PermissionDBSync
             return $this->callRemote('record', $changes);
         }
         \DB::transaction(function () use ($changes) {
-            $this->eachChanges($changes, function ($change, $groups) {
+            foreach ($changes as $change) {
                 if ($change['action'] === 'create') {
-                    $this->createChange($change, $groups);
+                    $this->createChange($change);
                 } elseif ($change['action'] === 'delete') {
-                    $this->deleteChange($change, $groups);
+                    $this->deleteChange($change);
                 } else {
-                    $this->updateChange($change, $groups);
+                    $this->updateChange($change);
                 }
-            });
+            }
         });
     }
 
@@ -48,16 +40,16 @@ class PermissionDBSync
             return $this->callRemote('rollback', $changes);
         }
         \DB::transaction(function () use ($changes) {
-            $this->eachChanges($changes, function ($change, $groups) {
+            foreach ($changes as $change) {
                 if ($change['action'] === 'create') {
-                    $this->deleteChange($change, $groups);
+                    $this->deleteChange($change);
                 } elseif ($change['action'] === 'delete') {
-                    $this->createChange($change, $groups);
+                    $this->createChange($change);
                 } else {
                     $change = array_merge($change, $change['changes']);
-                    $this->updateChange($change, $groups);
+                    $this->updateChange($change);
                 }
-            });
+            }
         });
     }
 
@@ -76,51 +68,23 @@ class PermissionDBSync
         ])->getBody()->getContents();
     }
 
-    protected function eachChanges($changes, $callback)
+    protected function createChange($change)
     {
-        foreach ($changes as $change) {
-            foreach ((array)$change['auth'] as $item) {
-                $groups = explode(',', $item);
-                $auth = array_shift($groups);
-                if (!$this->auth || $auth == $this->auth) {
-                    $callback($change, count($groups) ? $groups : [null]);
-                }
-            }
-        }
+        Permission::create($change);
     }
 
-    protected function createChange($change, $groups)
+    protected function updateChange($change)
     {
-        foreach ($groups as $group) {
-            Permission::create(array_merge(['name' => $change['name'], 'type' => $change['type'], 'group' => $group], $this->getPermissionData($change)));
-        }
+        Permission::query()->where('name', $change['name'])
+            ->update([
+                'type' => $change['type'],
+                'scopes' => json_encode($change['scopes']),
+                'content' => json_encode($change['content']),
+            ]);
     }
 
-    protected function updateChange($change, $groups)
-    {
-        $rows = Permission::query()->where('name', $change['name'])->get();
-        foreach ($groups as $group) {
-            if ($row = $rows->firstWhere('group', $group)) {
-                $row->update($this->getPermissionData($change));
-                $row->flag = true;
-            } else {
-                Permission::create(array_merge(['name' => $change['name'], 'type' => $change['type'], 'group' => $group], $this->getPermissionData($change)));
-            }
-        }
-        foreach ($rows as $row) if (!$row->flag) $row->delete();
-    }
-
-    protected function deleteChange($change, $groups)
+    protected function deleteChange($change)
     {
         Permission::query()->where('name', $change['name'])->delete();
-    }
-
-    protected function getPermissionData($permission)
-    {
-        return [
-            'content' => [
-                'url' => $permission['path']
-            ]
-        ];
     }
 }

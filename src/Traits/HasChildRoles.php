@@ -2,7 +2,7 @@
 
 namespace YiluTech\Permission\Traits;
 
-use YiluTech\Permission\Util;
+use YiluTech\Permission\Helper\Helper;
 use YiluTech\Permission\Models\Role;
 
 trait HasChildRoles
@@ -14,7 +14,7 @@ trait HasChildRoles
      */
     public function childRoles()
     {
-        return Util::array_get($this->relations, 'childRoles', function () {
+        return Helper::array_get($this->relations, 'childRoles', function () {
             return $this->hasChild()
                 ? Role::query()->join('role_has_roles', 'roles.id', 'child_id')->where('role_id', $this->id)->get()
                 : collect([]);
@@ -26,7 +26,7 @@ trait HasChildRoles
      */
     public function parentRoles()
     {
-        return Util::array_get($this->relations, 'parentRoles', function () {
+        return Helper::array_get($this->relations, 'parentRoles', function () {
             return $this->getLevel() < $this->MAX_LEVEL
                 ? Role::query()->join('role_has_roles', 'roles.id', 'child_id')->where('role_id', $this->id)->get()
                 : collect([]);
@@ -38,7 +38,7 @@ trait HasChildRoles
      */
     public function extendPermissions()
     {
-        return Util::array_get($this->relations, 'extendPermissions', function () {
+        return Helper::array_get($this->relations, 'extendPermissions', function () {
             return $this->childRoles()->flatMap(function ($role) {
                 return $role->extendPermissions();
             })->unique('id');

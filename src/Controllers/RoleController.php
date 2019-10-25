@@ -8,14 +8,14 @@
 
 namespace YiluTech\Permission\Controllers;
 
+use YiluTech\Permission\Helper\RoleGroup;
 use YiluTech\Permission\Models\Role;
-use YiluTech\Permission\Util;
 
 class RoleController
 {
     public function list()
     {
-        return Role::status(RS_READ, Util::get_query_role_group())
+        return Role::status(RS_READ, RoleGroup::getFromQuery())
             ->leftJoin('role_has_roles', 'role_has_roles.role_id', 'roles.id')
             ->select('roles.*', \DB::raw('group_concat(child_id separator ",") as child_keys'))
             ->groupBy('id')->get()->each(function ($item) {
@@ -34,7 +34,7 @@ class RoleController
             'permissions' => 'array'
         ]);
         $data = \Request::only(['name', 'description', 'config']);
-        if (($group = Util::get_query_role_group()) !== false) {
+        if (($group = RoleGroup::getFromQuery()) !== false) {
             $data['group'] = $group;
         }
 
@@ -65,7 +65,8 @@ class RoleController
             'roles' => 'array',
             'permissions' => 'array'
         ]);
-        $role = Role::findById(\Request::input('role_id'), Util::get_query_role_group());
+
+        $role = Role::findById(\Request::input('role_id'), RoleGroup::getFromQuery());
         if (!$role) throw new \Exception('role not found');
 
         $data = \Request::only(['name', 'description', 'config']);
@@ -94,7 +95,7 @@ class RoleController
     {
         \Request::validate(['role_id' => 'required|integer']);
 
-        $role = Role::findById(\Request::input('role_id'), Util::get_query_role_group());
+        $role = Role::findById(\Request::input('role_id'), RoleGroup::getFromQuery());
         if (!$role) throw new \Exception('role not found');
 
         if ($role->status & RS_SYS) {

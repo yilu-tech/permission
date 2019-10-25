@@ -9,13 +9,6 @@ use YiluTech\Permission\Models\Permission;
 
 class PermissionDBSync
 {
-    public static function runRequest($request)
-    {
-        $self = new static();
-        $action = $request->input('action');
-        return $self->{$action}($request->input('changes'));
-    }
-
     public function record($changes)
     {
         if ($this->isClient()) {
@@ -60,11 +53,11 @@ class PermissionDBSync
 
     protected function callRemote($action, $changes)
     {
+        $url = config('permission.remote') . '/permission/sync';
         $params = compact('action', 'changes');
-        $params['auth'] = $this->auth;
 
-        return (new Client)->post(config('permission.remote'), [
-            'json' => $params
+        return (new Client)->post($url, [
+            'json' => $params,
         ])->getBody()->getContents();
     }
 

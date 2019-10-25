@@ -10,6 +10,7 @@ namespace YiluTech\Permission\Controllers;
 
 use YiluTech\Permission\Models\Permission;
 use YiluTech\Permission\Models\Role;
+use YiluTech\Permission\PermissionDBSync;
 
 class PermissionController
 {
@@ -94,5 +95,16 @@ class PermissionController
         }
         $permission->update(compact('translations'));
         return 'success';
+    }
+
+    public function sync(PermissionDBSync $DBSync)
+    {
+        \Request::validate([
+            'action' => 'required|in:record,rollback',
+            'changes' => 'required|array|min:1'
+        ]);
+        $action = \Request::input('action');
+        $DBSync->{$action}(\Request::input('changes'));
+        return 'SUCCESS';
     }
 }

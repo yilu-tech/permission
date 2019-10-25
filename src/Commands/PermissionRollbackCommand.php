@@ -29,8 +29,11 @@ class PermissionRollbackCommand extends BasePermissionCommand
      */
     public function handle()
     {
-        $changes = $this->getChanged();
-        if ($synced = $this->isSyncChanges($changes)) {
+        $path = $this->option('path');
+        $changes = $this->manager->getStoredChanges($path);
+        $synced = $this->manager->isSyncedChanges($changes);
+
+        if ($synced) {
             array_shift($changes);
         }
 
@@ -39,22 +42,18 @@ class PermissionRollbackCommand extends BasePermissionCommand
                 if (!$synced) {
                     return $this->info('changes no commit.');
                 }
-                (new PermissionDBSync($this->option('auth')))->rollback($changes);
+                (new PermissionDBSync)->rollback($changes);
+                $this->writeToFile($this->manager->getChangesFilePath($path), $changes);
             } else {
                 if ($synced) {
                     return $this->info('changes has been sync to database, please rollback with db.');
                 }
+                $changes = null;
+                $this->write(null, $this->manager->getLastStored($path));
             }
-            $this->fileRollback();
             $this->info("rollback $count rows.");
         } else {
             $this->info('no permission to rollback.');
         }
-    }
-
-    protected function fileRollback()
-    {
-        $this->write($this->getPath('permissions.php'), $this->getLastStored());
-        $this->file->delete($this->getPath('changes.php'));
     }
 }

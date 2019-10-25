@@ -3,8 +3,9 @@
 namespace YiluTech\Permission\Traits;
 
 use Illuminate\Support\Facades\Auth;
+use YiluTech\Permission\Helper\Helper;
+use YiluTech\Permission\Helper\RoleGroup;
 use YiluTech\Permission\PermissionCache;
-use YiluTech\Permission\Util;
 use YiluTech\Permission\Models\Role;
 
 trait HasRoles
@@ -20,7 +21,7 @@ trait HasRoles
      */
     public function roles($group = false)
     {
-        $roles = Util::array_get($this->relations, 'roles', function () {
+        $roles = Helper::array_get($this->relations, 'roles', function () {
             return \DB::table('user_has_roles')
                 ->leftJoin('roles', 'roles.id', 'user_has_roles.role_id')
                 ->where('user_id', '=', $this->id)
@@ -47,7 +48,7 @@ trait HasRoles
             $this->relations['permissions'] = [];
         }
         $groupName = $group === false ? '0' : $group;
-        return Util::array_get($this->relations['permissions'], $groupName, function () use ($group) {
+        return Helper::array_get($this->relations['permissions'], $groupName, function () use ($group) {
             return $this->roles($group)->flatMap(function ($role) {
                 return $role->permissions();
             })->unique('id')->values();
@@ -167,7 +168,7 @@ trait HasRoles
         if ($this->hasAllRoles()) {
             return true;
         }
-        foreach ($this->roles(Util::parse_role_group($group)['key']) as $role) {
+        foreach ($this->roles(RoleGroup::parse($group, 'key')) as $role) {
             if ($role->isAdministrator()) {
                 return true;
             }
@@ -198,12 +199,9 @@ trait HasRoles
 
     protected function makeRoleGroup($role)
     {
-        $group = Util::parse_role_group($role->group);
-
+        $group = RoleGroup::parse($role->group);
         if (!$group['key']) return '';
-
-        if ($group['value'] === null) return $group['key'] . ':' . Util::get_role_group_value($group['key']);
-
+        if ($group['value'] === null) return $group['key'] . ':' . RoleGroup::value($group['key']);
         return $role->group;
     }
 }

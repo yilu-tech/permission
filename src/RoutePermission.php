@@ -6,19 +6,9 @@ namespace YiluTech\Permission;
 
 class RoutePermission
 {
-    public static function remote()
-    {
-        return [];
-    }
-
-    public static function local()
-    {
-        return (new static)->getRoutes();
-    }
-
     public static function all()
     {
-        return array_merge(static::local(), static::remote());
+        return (new static)->getRoutes();
     }
 
     public function getRoutes()
@@ -30,7 +20,7 @@ class RoutePermission
         foreach (app()->router->getRoutes() as $route) {
             $name = $this->getName($route);
 
-            if (!$name || count($parts = explode('@', $name)) !== 2) {
+            if (!$name || count($parts = explode('@', $name, 2)) !== 2) {
                 continue;
             }
 

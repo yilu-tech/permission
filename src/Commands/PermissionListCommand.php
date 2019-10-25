@@ -27,42 +27,45 @@ class PermissionListCommand extends BasePermissionCommand
      */
     public function handle()
     {
+        $headers = ['name', 'type', 'scopes', 'content'];
+
+        $path = $this->option('path');
+
         if ($this->option('stored')) {
-            return $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore'], $this->getStored());
+            return $this->outputTable($headers, $this->manager->getStored($path));
         }
 
         if ($this->option('last')) {
-            return $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore'], $this->getLastStored());
+            return $this->outputTable($headers, $this->manager->getLastStored($path));
         }
 
         if ($this->option('changed')) {
-            $changes = $this->getChanged();
-            if ($this->isSyncChanges($changes)) {
+            $changes = $this->manager->getStoredChanges($path);
+            if ($this->manager->isSyncedChanges($changes)) {
                 array_shift($changes);
             }
-            return $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore', 'action', 'changes'], $changes);
+            $headers[] = 'actions';
+            $headers[] = 'changes';
+            return $this->outputTable($headers, $changes);
         }
 
         if ($this->option('changes')) {
-            return $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore', 'action', 'changes'], $this->getChanges($this->getRoutePermission(), $this->getStored()));
+            $headers[] = 'actions';
+            $headers[] = 'changes';
+            return $this->outputTable($headers, $this->manager->getChanges($this->manager->getStored($path)));
         }
 
-        $this->outputTable(['name', 'type', 'method', 'path', 'auth', 'rbac_ignore'], $this->getRoutePermission());
+        return $this->outputTable($headers, $this->manager->all());
     }
 
     protected function outputTable($headers, $rows)
     {
         $rows = array_map(function ($item) {
-            $item['rbac_ignore'] = $item['rbac_ignore'] ? 'true' : 'false';
-
-            if (is_array($item['auth'])) {
-                $item['auth'] = $this->arrayToString($item['auth'], -1, '', '');
-            }
-
+            $item['scopes'] = $this->arrayToString($item['scopes'], -1, '', '');
+            $item['content'] = $this->arrayToString($item['content'], -1, '', '');
             if (isset($item['changes'])) {
                 $item['changes'] = $this->arrayToString($item['changes'], -1, '', '');
             }
-
             return $item;
         }, $rows);
         $this->table($headers, $rows);

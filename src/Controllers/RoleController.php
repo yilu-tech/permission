@@ -34,7 +34,7 @@ class RoleController
             'permissions' => 'array'
         ]);
         $data = \Request::only(['name', 'description', 'config']);
-        if (($group = RoleGroup::getFromQuery()) !== false) {
+        if ($group = RoleGroup::getFromQuery()) {
             $data['group'] = $group;
         }
 

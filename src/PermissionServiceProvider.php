@@ -72,10 +72,10 @@ class PermissionServiceProvider extends ServiceProvider
             Route::post('role/delete', 'RoleController@delete')->name('role.delete');
         });
 
-        Route::group($this->app['config']['permission']['internal_route_option'] ?? [], function ($router) {
-            Route::post('permission/sync', function ($request) {
-                return PermissionDBSync::runRequest($request);
-            })->name('permission.sync');
+        $options = array_merge($defaultOptions, $this->app['config']['permission']['internal_route_option'] ?? []);
+
+        Route::group($options, function ($router) {
+            Route::post('permission/sync', 'PermissionController@sync')->name('permission.sync');
         });
     }
 

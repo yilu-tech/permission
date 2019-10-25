@@ -21,8 +21,30 @@ class RoleGroup
             return false;
         }
         $group = \Request::input($name);
-        $value = static::value($group);
-        return $value === null ? '' : "$group:$value";
+        return $group ? "$group:" . static::value($group) : null;
+    }
+
+    /**
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param string $group
+     * @param string $key
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public static function bindQuery($query, $group, $key = 'group')
+    {
+        if ($group === null) {
+            $query->whereNull($key);
+        } elseif ($group) {
+            $query->where(function ($query) use ($group, $key) {
+                $query->where($key, $group);
+                if ($group = strstr($group, ':', true)) {
+                    $query->orWhere($key, $group);
+                } else {
+                    $query->orWhereNull($key, $group);
+                }
+            });
+        }
+        return $query;
     }
 
     public static function scope($group)

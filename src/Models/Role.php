@@ -36,15 +36,7 @@ class Role extends Model
 
     public static function group($group)
     {
-        if ($group === false) {
-            return static::query();
-        }
-        if (!$group) {
-            return static::query()->whereNull('roles.group');
-        }
-        return static::query()->where(function ($query) use ($group) {
-            $query->where('roles.group', $group)->orWhere('roles.group', strstr($group, ':', true));
-        });
+        return RoleGroup::bindQuery(static::query(), $group, 'roles.group');
     }
 
     public function isAdministrator()

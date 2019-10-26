@@ -76,11 +76,14 @@ trait HasPermissions
 
     public function givePermissionTo($permissions)
     {
+        if (!($this->status & RS_WRITE)) {
+            throw new \Exception("Role<{$this->name}> not allow change.");
+        }
         collect($permissions)->map(function ($permission) {
             return $this->getStoredPermission($permission);
         })->each(function ($permission) {
             if ($this->hasPermission($permission)) {
-                throw new \Exception("permission<{$permission->name}> already exists");
+                throw new \Exception("Permission<{$permission->name}> already exists");
             }
         })->each(function ($permission) {
             \DB::table('role_has_permissions')->insert(['role_id' => $this->id, 'permission_id' => $permission->id]);
@@ -92,9 +95,13 @@ trait HasPermissions
     /**
      * @param null $permissions
      * @return static
+     * @throws \Exception
      */
     public function revokePermissionTo($permissions = null)
     {
+        if (!($this->status & RS_WRITE)) {
+            throw new \Exception("Role<{$this->name}> not allow change.");
+        }
         $query = \DB::table('role_has_permissions')->where('role_id', $this->id);
         if ($permissions) {
             $query->whereIn('permission_id', collect($permissions)->pluck('id'));

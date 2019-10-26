@@ -39,7 +39,7 @@ class RoleController
         }
 
         return \DB::transaction(function () use ($data) {
-            $data['status'] = RS_EXTEND | RS_READ;
+            $data['status'] = RS_EXTEND | RS_READ | RS_WRITE;
             if (count($roles = \Request::input('roles', []))) {
                 $data['status'] = $data['status'] | RS_EXTENDED;
             }
@@ -67,7 +67,11 @@ class RoleController
         ]);
 
         $role = Role::findById(\Request::input('role_id'), RoleGroup::getFromQuery());
-        if (!$role) throw new \Exception('role not found');
+        if (!$role) throw new \Exception('Role not found.');
+
+        if (!($role->status & RS_WRITE)) {
+            throw new \Exception('Role not allow edit.');
+        }
 
         $data = \Request::only(['name', 'description', 'config']);
         $data['status'] = $role->status & ~RS_EXTENDED;

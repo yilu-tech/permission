@@ -7,12 +7,13 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 define('RS_ADMIN', 1);
-define('RS_BASICS', 2);
+define('RS_BASIC', 2);
 define('RS_SYS', 4);
 define('RS_READ', 8);
-define('RS_EXTEND', 16);
-define('RS_EXTENDED', 32);
-define('RS_DISABLED', 64);
+define('RS_WRITE', 16);
+define('RS_EXTEND', 32);
+define('RS_EXTENDED', 64);
+define('RS_DISABLED', 128);
 
 class PermissionServiceProvider extends ServiceProvider
 {

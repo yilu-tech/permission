@@ -8,7 +8,7 @@ class Permission extends Model
 {
     protected $table = 'permissions';
 
-    protected $fillable = ['name', 'type', 'scopes', 'content', 'translations'];
+    protected $fillable = ['id', 'name', 'type', 'scopes', 'content', 'translations'];
 
     protected $casts = [
         'config' => 'json',

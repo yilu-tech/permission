@@ -83,7 +83,7 @@ trait HasRoles
         });
 
         if ($basics) {
-            $roles = $roles->merge(Role::status(RS_BASICS, $group)->get());
+            $roles = $roles->merge(Role::status(RS_BASIC, $group)->get());
         }
 
         if (!$roles->count()) {

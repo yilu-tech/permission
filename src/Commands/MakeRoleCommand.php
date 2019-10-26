@@ -14,7 +14,7 @@ class MakeRoleCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'make:role {name} {--a|admin} {--s|sys} {--e|extend} {--b|basics} {--r|read} {--G|group=} {--A|alias=}';
+    protected $signature = 'make:role {name} {--a|admin} {--s|sys} {--e|extend} {--b|basics} {--r|read} {--w|write} {--G|group=} {--A|alias=}';
 
     /**
      * The console command description.
@@ -52,11 +52,15 @@ class MakeRoleCommand extends Command
         }
 
         if ($this->option('basics')) {
-            $role['status'] = $role['status'] | RS_BASICS & ~RS_EXTEND;
+            $role['status'] = $role['status'] | RS_BASIC & ~RS_EXTEND;
         }
 
         if ($this->option('read')) {
             $role['status'] = $role['status'] | RS_READ;
+        }
+
+        if ($this->option('write')) {
+            $role['status'] = $role['status'] | RS_WRITE;
         }
 
         $role = Role::create($role);

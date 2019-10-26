@@ -21,20 +21,20 @@ class Role extends Model
 
     public static function findById(int $id, $group = false)
     {
-        return static::group($group)->find($id);
+        return static::queryWithGroup($group)->find($id);
     }
 
     public static function findByName(string $name, $group = false)
     {
-        return static::group($group)->where('alias', $name)->first();
+        return static::queryWithGroup($group)->where('alias', $name)->first();
     }
 
     public static function status($status, $group = false)
     {
-        return static::group($group)->where('roles.status', '&', $status);
+        return static::queryWithGroup($group)->where('roles.status', '&', $status);
     }
 
-    public static function group($group)
+    public static function queryWithGroup($group)
     {
         return RoleGroup::bindQuery(static::query(), $group, 'roles.group');
     }

@@ -45,11 +45,13 @@ class PermissionServiceProvider extends ServiceProvider
                 \YiluTech\Permission\Commands\PermissionRecordCommand::class,
                 \YiluTech\Permission\Commands\PermissionRollbackCommand::class,
             ]);
+
+            $this->offerPublishing();
         }
 
-        $this->registerRoute();
-
-        $this->offerPublishing();
+        if (!$this->app['config']['permission.remote']) {
+            $this->registerRoute();
+        }
     }
 
     public function registerRoute()

@@ -4,6 +4,8 @@
 namespace YiluTech\Permission;
 
 
+use Illuminate\Support\Arr;
+
 class PermissionManager
 {
     protected $items;
@@ -105,7 +107,7 @@ class PermissionManager
         foreach ($items as $item) {
             switch ($item['type']) {
                 case 'api':
-                    $item = $this->routeFormatter($item);
+                    $item = $this->routeFormatter($item, $data[$item['name']] ?? null);
                     break;
                 default:
                     break;
@@ -115,7 +117,7 @@ class PermissionManager
         return $data;
     }
 
-    protected function routeFormatter($item)
+    protected function routeFormatter($item, $config = null)
     {
         $data = [
             'name' => $item['name'],
@@ -142,6 +144,16 @@ class PermissionManager
                 } else {
                     $data['scopes'][] = $parts[0];
                 }
+            }
+        }
+
+        if ($config) {
+            $data['scopes'] = array_values(array_unique(array_merge($data['scopes'], $config['scopes'])));
+            if (Arr::isAssoc($config['content'])) {
+                $data['content'] = [$config['content'], $data['content']];
+            } else {
+                array_push($config['content'], $data['content']);
+                $data['content'] = $config['content'];
             }
         }
 

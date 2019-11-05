@@ -86,14 +86,14 @@ class PermissionManager
         foreach (array_udiff_assoc($new, $old, $differ) as $key => $item) {
             if (isset($old[$key])) {
                 $item['action'] = 'update';
-                $item['changes'] = array_udiff_assoc($new[$key], $item, $differ);
+                $item['changes'] = array_udiff_assoc($old[$key], $item, $differ);
             } else {
                 $item['action'] = 'create';
             }
             $changes[$key] = $item;
         }
         foreach (array_udiff_assoc($old, $new, $differ) as $key => $item) {
-            if (empty($old[$key])) {
+            if (empty($new[$key])) {
                 $item['action'] = 'delete';
                 $changes[$key] = $item;
             }

@@ -41,7 +41,6 @@ class PermissionServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 \YiluTech\Permission\Commands\MakeRoleCommand::class,
-                \YiluTech\Permission\Commands\PermissionListCommand::class,
                 \YiluTech\Permission\Commands\PermissionRecordCommand::class,
                 \YiluTech\Permission\Commands\PermissionRollbackCommand::class,
             ]);

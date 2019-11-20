@@ -10,7 +10,7 @@ namespace YiluTech\Permission\Controllers;
 
 use YiluTech\Permission\Models\Permission;
 use YiluTech\Permission\Models\Role;
-use YiluTech\Permission\PermissionDBSync;
+use YiluTech\Permission\PermissionManager;
 
 class PermissionController
 {
@@ -97,14 +97,21 @@ class PermissionController
         return 'success';
     }
 
-    public function sync(PermissionDBSync $DBSync)
+    public function sync()
     {
         \Request::validate([
-            'action' => 'required|in:record,rollback',
-            'changes' => 'required|array|min:1'
+            'action' => 'required|in:update,getLastUpdateTime',
+            'changes' => 'required_if:action,update|array|min:1'
         ]);
-        $action = \Request::input('action');
-        $DBSync->{$action}(\Request::input('changes'));
-        return 'SUCCESS';
+        $manager = new PermissionManager(\Request::input('server'));
+        switch (\Request::input('action')) {
+            case 'getLastUpdateTime':
+                return $manager->getLastUpdateTime();
+            case 'update':
+                $manager->writeDB(\Request::input('changes'));
+                return 'SUCCESS';
+            default:
+                return 'FAIL';
+        }
     }
 }

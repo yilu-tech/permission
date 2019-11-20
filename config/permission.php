@@ -3,6 +3,8 @@
 return [
     // 'remote' => '',
 
+    // 'server' => '',
+
     'user' => [
         'model' => \App\User::class
     ],

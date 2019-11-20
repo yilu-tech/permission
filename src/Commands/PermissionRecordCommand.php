@@ -4,9 +4,10 @@
 namespace YiluTech\Permission\Commands;
 
 
-use YiluTech\Permission\PermissionDBSync;
+use Illuminate\Console\Command;
+use YiluTech\Permission\PermissionManager;
 
-class PermissionRecordCommand extends BasePermissionCommand
+class PermissionRecordCommand extends Command
 {
     /**
      * The name and signature of the console command.
@@ -29,29 +30,36 @@ class PermissionRecordCommand extends BasePermissionCommand
      */
     public function handle()
     {
-        $path = $this->option('path');
+        $manager = new PermissionManager();
 
-        $changes = $this->manager->getStoredChanges($path);
-        $synced = $this->manager->isSyncedChanges($changes);
-
-        if ($this->option('db')) {
-            if ($synced) {
-                return $this->info('changes has been sync.');
-            }
-            if (!count($changes)) {
-                return $this->info('no changes to sync.');
-            }
-            (new PermissionDBSync)->record($changes);
-
-            array_unshift($changes, 'changed');
-            $this->writeToFile($this->manager->getChangesFilePath($path), $changes);
-            $synced = true;
-        } else {
-            $old = $synced ? $this->manager->getStored($path) : $this->manager->getLastStored($path);
-            $changes = $this->manager->getChanges($old);
-            $this->write($changes);
+        if ($path = $this->option('path')) {
+            $manager->setFilePath($path);
         }
-        $count = $synced ? count($changes) - 1 : count($changes);
-        $this->info('record ' . $count . ' changes.');
+
+        $this->option('db')
+            ? $this->saveChanges($manager)
+            : $this->writeChanges($manager);
+    }
+
+    protected function writeChanges(PermissionManager $manager)
+    {
+        $changes = $manager->getChanges($manager->old());
+        if ($count = count($changes)) {
+            $manager->writeFile($changes);
+            $this->info("Write $count changes.");
+        } else {
+            $this->info('Nothing to write.');
+        }
+    }
+
+    protected function saveChanges(PermissionManager $manager)
+    {
+        $changes = $manager->readFile($manager->getLastUpdateTime());
+        if ($count = count($changes)) {
+            $manager->writeDB($changes);
+            $this->info("Save $count changes.");
+        } else {
+            $this->info('Nothing to save.');
+        }
     }
 }

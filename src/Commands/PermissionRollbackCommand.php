@@ -4,23 +4,24 @@
 namespace YiluTech\Permission\Commands;
 
 
-use YiluTech\Permission\PermissionDBSync;
+use Illuminate\Console\Command;
+use YiluTech\Permission\PermissionManager;
 
-class PermissionRollbackCommand extends BasePermissionCommand
+class PermissionRollbackCommand extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'permission:rollback {--db} {--path=} {--auth=}';
+    protected $signature = 'permission:rollback {date} {--path=}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'migrate permission.';
+    protected $description = 'rollback permission.';
 
     /**
      * Execute the console command.
@@ -29,31 +30,26 @@ class PermissionRollbackCommand extends BasePermissionCommand
      */
     public function handle()
     {
-        $path = $this->option('path');
-        $changes = $this->manager->getStoredChanges($path);
-        $synced = $this->manager->isSyncedChanges($changes);
+        $manager = new PermissionManager();
 
-        if ($synced) {
-            array_shift($changes);
+        if ($path = $this->option('path')) {
+            $manager->setFilePath($path);
         }
 
-        if ($count = count($changes)) {
-            if ($this->option('db')) {
-                if (!$synced) {
-                    return $this->info('changes no commit.');
-                }
-                (new PermissionDBSync)->rollback($changes);
-                $this->writeToFile($this->manager->getChangesFilePath($path), $changes);
-            } else {
-                if ($synced) {
-                    return $this->info('changes has been sync to database, please rollback with db.');
-                }
-                $changes = null;
-                $this->write(null, $this->manager->getLastStored($path));
-            }
-            $this->info("rollback $count rows.");
+        $date = $this->argument('date');
+
+        if (strtolower($date) === 'null') {
+            $date = null;
+        } elseif (strtotime($date) === false) {
+            $this->info('Date format error.');
+            return;
+        }
+
+        if ($count = count($manager->readFile($date))) {
+            $manager->rollbackChanges($date);
+            $this->info("Rollback $count changes.");
         } else {
-            $this->info('no permission to rollback.');
+            $this->info('Nothing to rollback.');
         }
     }
 }

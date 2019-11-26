@@ -10,6 +10,8 @@ use YiluTech\Permission\Models\Permission;
 
 class PermissionManager
 {
+    public $filter;
+
     protected $items;
 
     protected $server;
@@ -32,7 +34,10 @@ class PermissionManager
         if (!$this->items) {
             $this->items = $this->format(RoutePermission::all());
         }
-        return $this->items;
+        if (!$this->filter) {
+            return $this->items;
+        }
+        return array_filter($this->items, $this->filter);
     }
 
     public function getLastUpdateTime()
@@ -109,7 +114,10 @@ class PermissionManager
         $data = [];
         if (file_exists($file)) {
             $fs = fopen($file, 'r');
-            while (!feof($fs) && $row = trim(fgets($fs))) {
+            while (!feof($fs)) {
+                $row = trim(fgets($fs));
+                if (!$row) continue;
+
                 $item = $this->parseLine($row);
                 if ($start && $item['date'] < $start) continue;
                 if ($end && $item['date'] >= $end) break;

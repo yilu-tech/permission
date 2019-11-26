@@ -119,8 +119,8 @@ class PermissionManager
                 if (!$row) continue;
 
                 $item = $this->parseLine($row);
-                if ($start && $item['date'] < $start) continue;
-                if ($end && $item['date'] >= $end) break;
+                if ($start && $item['date'] <= $start) continue;
+                if ($end && $item['date'] > $end) break;
                 $only_data ? $this->mergeData($data, $item) : $this->merge($data, $item);
             }
             fclose($fs);

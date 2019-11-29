@@ -5,7 +5,7 @@ namespace YiluTech\Permission\Traits;
 use Illuminate\Support\Facades\Auth;
 use YiluTech\Permission\Helper\Helper;
 use YiluTech\Permission\Helper\RoleGroup;
-use YiluTech\Permission\PermissionCache;
+use YiluTech\Permission\UserPermissionCache;
 use YiluTech\Permission\Models\Role;
 
 trait HasRoles
@@ -55,16 +55,12 @@ trait HasRoles
         });
     }
 
-    public function syncPermissionCache(array $values = [])
+    /**
+     * @return UserPermissionCache
+     */
+    public function permissionCache()
     {
-        (new PermissionCache($this))->sync($values);
-        return $this;
-    }
-
-    public function clearPermissionCache()
-    {
-        (new PermissionCache($this))->clear();
-        return $this;
+        return new UserPermissionCache($this);
     }
 
     public function checkAuthorizer()
@@ -101,7 +97,8 @@ trait HasRoles
         });
 
         if ($fireEvent) {
-            $this->clearPermissionCache()->fireModelEvent('roleChanged');
+            $this->permissionCache()->clear();
+            $this->fireModelEvent('roleChanged');
         }
         return $this->unsetRelation('permissions');
     }
@@ -124,8 +121,10 @@ trait HasRoles
             $query->where('group', $group);
         }
         $query->delete();
+
         if ($fireEvent) {
-            $this->clearPermissionCache()->fireModelEvent('roleChanged');
+            $this->permissionCache()->clear();
+            $this->fireModelEvent('roleChanged');
         }
         return $this->unsetRelation('roles')->unsetRelation('permissions');
     }

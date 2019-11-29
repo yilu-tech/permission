@@ -8,6 +8,7 @@
 
 namespace YiluTech\Permission\Controllers;
 
+use YiluTech\Permission\CacheManager;
 use YiluTech\Permission\Helper\RoleGroup;
 use YiluTech\Permission\Models\Role;
 
@@ -33,23 +34,22 @@ class RoleController
             'roles' => 'array',
             'permissions' => 'array'
         ]);
-        $data = \Request::only(['name', 'description', 'config']);
+        $data = \Request::only(['name', 'description', 'config', 'roles', 'permissions']);
         if ($group = RoleGroup::getFromQuery()) {
             $data['group'] = $group;
         }
 
         return \DB::transaction(function () use ($data) {
             $data['status'] = RS_EXTEND | RS_READ | RS_WRITE;
-            if (count($roles = \Request::input('roles', []))) {
+            if (!empty($data['roles'])) {
                 $data['status'] = $data['status'] | RS_EXTENDED;
             }
             $role = Role::create($data);
-
             if ($data['status'] & RS_EXTENDED) {
-                $role->giveChildRoleTo($roles);
+                $role->giveChildRoleTo($data['roles']);
             }
-            if (count($permissions = \Request::input('permissions', []))) {
-                $role->givePermissionTo($permissions);
+            if (!empty($data['permissions'])) {
+                $role->givePermissionTo($data['permissions']);
             }
             return $role;
         });
@@ -73,24 +73,25 @@ class RoleController
             throw new \Exception('Role not allow edit.');
         }
 
-        $data = \Request::only(['name', 'description', 'config']);
+        $data = \Request::only(['name', 'description', 'config', 'roles', 'permissions']);
         $data['status'] = $role->status & ~RS_EXTENDED;
 
-        if (count($roles = \Request::input('roles', []))) {
+        if (!empty($data['roles'])) {
             if ($data['status'] & RS_SYS) {
                 throw new \Exception('system role can not extend other role.');
             }
             $data['status'] = $data['status'] | RS_EXTENDED;
         }
 
-        return \DB::transaction(function () use ($role, $data, $roles) {
+        return \DB::transaction(function () use ($role, $data) {
             $role->update($data);
             if ($data['status'] & RS_EXTENDED) {
-                $role->syncChildRoles($roles);
+                $role->syncChildRoles($data['roles']);
             }
-            if (count($permissions = \Request::input('permissions', []))) {
-                $role->syncPermissions($permissions);
-            }
+            $role->syncPermissions($data['permissions'] ?? []);
+
+            resolve(CacheManager::class)->empty($role);
+
             return $role;
         });
     }

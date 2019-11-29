@@ -3,6 +3,7 @@
 namespace YiluTech\Permission\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use YiluTech\Permission\CacheManager;
 use YiluTech\Permission\Helper\RoleGroup;
 use YiluTech\Permission\Traits\HasChildRoles;
 use YiluTech\Permission\Traits\HasPermissions;
@@ -18,6 +19,14 @@ class Role extends Model
     protected $casts = [
         'config' => 'json',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+        static::deleted(function ($role) {
+            resolve(CacheManager::class)->empty($role);
+        });
+    }
 
     public static function findById(int $id, $group = false)
     {

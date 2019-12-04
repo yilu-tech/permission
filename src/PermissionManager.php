@@ -289,16 +289,14 @@ class PermissionManager
         $data = [
             'name' => $item['name'],
             'type' => $item['type'],
-            'scopes' => [],
             'content' => [
                 'url' => $item['path'],
                 'method' => $item['method']
             ]
         ];
-        if (!empty($change['rbac_ignore'])) {
-            $data['content']['rbac_ignore'] = $change['rbac_ignore'];
+        if (!empty($item['rbac_ignore'])) {
+            $data['content']['rbac_ignore'] = $item['rbac_ignore'];
         }
-
         if ($item['auth'] === '*') {
             $data['scopes'] = ['*'];
         } else {
@@ -306,7 +304,7 @@ class PermissionManager
                 $parts = explode('.', $auth, 2);
                 if (isset($parts[1])) {
                     foreach (explode(',', $parts[1]) as $group) {
-                        $data['scopes'][] = $group ? "{$parts[0]}.$group" : $parts[0];
+                        $data['scopes'][] = $group && $group !== 'default' ? "{$parts[0]}.$group" : $parts[0];
                     }
                 } else {
                     $data['scopes'][] = $parts[0];

@@ -18,10 +18,11 @@ trait HasPermissions
             if (array_key_exists(HasChildRoles::class, class_uses($this))) {
                 $permissions = $permissions->merge($this->childRoles()->flatMap(function ($role) {
                     return $role->permissions();
-                }))->unique('id');
+                }))->unique('id')->values();
             }
-
-            return $permissions;
+            return $permissions->each(function ($item) {
+                $item->groups = [$this->group];
+            });
         });
     }
 

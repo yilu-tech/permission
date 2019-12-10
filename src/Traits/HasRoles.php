@@ -49,9 +49,17 @@ trait HasRoles
         }
         $groupName = $group === false ? '0' : $group;
         return Helper::array_get($this->relations['permissions'], $groupName, function () use ($group) {
-            return $this->roles($group)->flatMap(function ($role) {
-                return $role->permissions();
-            })->unique('id')->values();
+            $permissions = [];
+            foreach ($this->roles($group) as $role) {
+                foreach ($role->permissions() as $permission) {
+                    if (isset($permissions[$permission->id])) {
+                        $permissions[$permission->id]->groups += $permission->groups;
+                    } else {
+                        $permissions[$permission->id] = $permission;
+                    }
+                }
+            }
+            return collect(array_values($permissions));
         });
     }
 

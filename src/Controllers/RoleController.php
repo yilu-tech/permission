@@ -26,8 +26,13 @@ class RoleController
 
     public function create()
     {
+        $group = RoleGroup::getFromQuery();
+        $nameUniqueRule = 'unique:roles,name';
+        if ($group !== false) {
+            $nameUniqueRule .= ',NULL,id,group,' . ($group ?: 'NULL');
+        }
         \Request::validate([
-            'name' => ['required', 'regex:/^[A-Za-z0-9\x{4e00}-\x{9fa5}_-]{2,16}$/u'],
+            'name' => ['required', 'regex:/^[A-Za-z0-9\x{4e00}-\x{9fa5}_-]{2,16}$/u', $nameUniqueRule],
             'description' => 'nullable|string|max:255',
             'config' => 'nullable',
             'group' => 'nullable|string',
@@ -35,10 +40,9 @@ class RoleController
             'permissions' => 'array'
         ]);
         $data = \Request::only(['name', 'description', 'config', 'roles', 'permissions']);
-        if ($group = RoleGroup::getFromQuery()) {
+        if ($group) {
             $data['group'] = $group;
         }
-
         return \DB::transaction(function () use ($data) {
             $data['status'] = RS_EXTEND | RS_READ | RS_WRITE;
             if (!empty($data['roles'])) {
@@ -57,16 +61,21 @@ class RoleController
 
     public function update()
     {
+        $group = RoleGroup::getFromQuery();
+        $nameUniqueRule = 'unique:roles,name,' . \Request::input('role_id') . ',id';
+        if ($group !== false) {
+            $nameUniqueRule .= ',group,' . ($group ?: 'NULL');
+        }
         \Request::validate([
             'role_id' => 'required|integer',
-            'name' => ['required', 'regex:/^[A-Za-z0-9\x{4e00}-\x{9fa5}_-]{2,16}$/u'],
+            'name' => ['required', 'regex:/^[A-Za-z0-9\x{4e00}-\x{9fa5}_-]{2,16}$/u', $nameUniqueRule],
             'description' => 'nullable|string|max:255',
             'config' => 'nullable',
             'roles' => 'array',
             'permissions' => 'array'
         ]);
 
-        $role = Role::findById(\Request::input('role_id'), RoleGroup::getFromQuery());
+        $role = Role::findById(\Request::input('role_id'), $group);
         if (!$role) throw new \Exception('Role not found.');
 
         if (!($role->status & RS_WRITE)) {

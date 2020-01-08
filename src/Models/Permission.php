@@ -3,6 +3,7 @@
 namespace YiluTech\Permission\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 class Permission extends Model
 {
@@ -22,17 +23,24 @@ class Permission extends Model
         if (!$query) {
             $query = parent::query();
         }
+        $query->select('permissions.*');
         if ($scope) {
             $query->whereRaw("JSON_SEARCH(`scopes`, 'one', '$scope') IS NOT NULL");
         }
-        if (!$lang) {
+        if ($lang === null) {
             $lang = app()->getLocale();
         }
-        return $query->select('permissions.*', \DB::raw("JSON_EXTRACT(`translations`, '$.$lang') as translations"));
+        if ($lang) {
+            $query->addSelect(\DB::raw("JSON_EXTRACT(`translations`, '$.$lang') as translations"));
+        }
+        return $query;
     }
 
-    public static function findById(int $id, $scope = false)
+    public static function findById($id, $scope = false)
     {
+        if (is_array($id) || $id instanceof Collection) {
+            return static::query($scope)->findMany($id);
+        }
         return static::query($scope)->find($id);
     }
 

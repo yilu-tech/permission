@@ -8,6 +8,7 @@
 
 namespace YiluTech\Permission\Controllers;
 
+use Illuminate\Validation\Rule;
 use YiluTech\Permission\CacheManager;
 use YiluTech\Permission\Helper\RoleGroup;
 use YiluTech\Permission\Models\Role;
@@ -36,15 +37,21 @@ class RoleController
             'description' => 'nullable|string|max:255',
             'config' => 'nullable',
             'group' => 'nullable|string',
+            'status' => 'array',
+            'status.*' => [Rule::in([RS_EXTEND, RS_WRITE, RS_BASIC])],
             'roles' => 'array',
             'permissions' => 'array'
         ]);
-        $data = \Request::only(['name', 'description', 'config', 'roles', 'permissions']);
+        $data = \Request::only(['name', 'description', 'config', 'roles', 'permissions', 'status']);
+
+        $data['status'] = array_reduce($data['status'] ?? [], function ($mask, $status) {
+            return $mask | $status;
+        }, RS_READ);
+
         if ($group) {
             $data['group'] = $group;
         }
         return \DB::transaction(function () use ($data) {
-            $data['status'] = RS_EXTEND | RS_READ | RS_WRITE;
             if (!empty($data['roles'])) {
                 $data['status'] = $data['status'] | RS_EXTENDED;
             }
@@ -83,24 +90,18 @@ class RoleController
         }
 
         $data = \Request::only(['name', 'description', 'config', 'roles', 'permissions']);
-        $data['status'] = $role->status & ~RS_EXTENDED;
 
-        if (!empty($data['roles'])) {
-            if ($data['status'] & RS_SYS) {
-                throw new \Exception('system role can not extend other role.');
-            }
-            $data['status'] = $data['status'] | RS_EXTENDED;
+        if ($role->status & RS_SYS && !empty($data['roles'])) {
+            throw new \Exception('system role can not extend other role.');
         }
 
         return \DB::transaction(function () use ($role, $data) {
+            $changes = $role->syncChildRoles($data['roles'] ?? []) + $role->syncPermissions($data['permissions'] ?? []);
             $role->update($data);
-            if ($data['status'] & RS_EXTENDED) {
-                $role->syncChildRoles($data['roles']);
+
+            if ($changes) {
+                resolve(CacheManager::class)->empty($role);
             }
-            $role->syncPermissions($data['permissions'] ?? []);
-
-            resolve(CacheManager::class)->empty($role);
-
             return $role;
         });
     }
@@ -117,10 +118,13 @@ class RoleController
         }
 
         return \DB::transaction(function () use ($role) {
-            \DB::table('role_has_roles')->where('role_id', $role->id)->orWhere('child_id', $role->id)->delete();
-            \DB::table('role_has_permissions')->where('role_id', $role->id)->delete();
+            $role->permissionRelation()->detach();
+            $role->childRoleRelation()->detach();
+
             \DB::table('user_has_roles')->where('role_id', $role->id)->delete();
             $role->delete();
+
+            resolve(CacheManager::class)->empty($role);
             return ['data' => 'success'];
         });
     }

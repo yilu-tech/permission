@@ -24,55 +24,61 @@ class PermissionController
             if (\Request::has('with_child')) {
                 return $role->permissions();
             }
-            return $role->includePermissions();
+            return $role->permissions();
         }
         return Permission::query(\Request::input('scope', false))->get();
     }
 
     public function create()
     {
-        $attributes = \Request::input();
-        \Validator::make($attributes, [
+        \Request::validate([
             'name' => ['required', 'string', 'max:40', 'regex:/^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*$/', 'unique:permissions,name'],
             'type' => 'required|string|max:16',
             'scopes' => 'array',
             'content' => 'nullable|array'
-        ])->validate();
-        return Permission::query()->create($attributes);
+        ]);
+        $data = \Request::input();
+        if (empty($data['scopes'])) {
+            $data['scopes'] = [];
+        }
+        return Permission::query()->create($data);
     }
 
     public function update()
     {
-        $permission = Permission::findById(\Request::input('id', 0));
+        $permission = Permission::findById(\Request::input('permission_id'));
         if (!$permission) throw new \Exception('permission not exists');
-        $attributes = \Request::input();
-        \Validator::make($attributes, [
-            'name' => ['required', 'string', 'max:40', 'regex:/^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*$/', 'unique:permissions,name' . $attributes['id']],
-            'type' => 'required|string|max:16',
+        $data = \Request::input();
+        \Request::validate([
+            'name' => ['required', 'string', 'max:40', 'regex:/^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*$/', 'unique:permissions,name,' . $data['permission_id']],
+            'type' => 'string|max:16',
             'scopes' => 'array',
             'content' => 'nullable|array'
-        ])->validate();
-        return $permission->save($attributes) ? 'success' : 'fail';
+        ]);
+        $permission->update($data);
+        return $permission;
     }
 
     public function delete()
     {
-        return \DB::translation(function () {
+        if (\Request::has('permission_id')) {
+            Permission::query()->where('id', \Request::input('permission_id'))->delete();
+        } else {
             Permission::query()->where('name', \Request::input('name'))->delete();
-            return 'success';
-        });
+        }
+        return ['data' => 'success'];
     }
 
     public function translate()
     {
-        $attributes = \Request::input();
-        \Validator::make($attributes, [
+        \Request::validate([
             'name' => ['required', 'string', 'max:40', 'regex:/^([a-zA-Z0-9]+|[*])(\.[a-zA-Z0-9]+)*$/'],
             'lang' => 'required|string|in:zh_CN,en',
             'content' => 'nullable|string|max:64',
             'description' => 'nullable|string|max:255'
-        ])->validate();
-        $permission = Permission::findByName(\Request::input('name'));
+        ]);
+
+        $permission = Permission::query(false, false)->where('name', \Request::input('name'))->first();
         if (!$permission) {
             throw new \Exception('Permission not found');
         }
@@ -81,9 +87,7 @@ class PermissionController
             'name' => \Request::input('content'),
             'desc' => \Request::input('description')
         ];
-
         $translations = $permission->translations;
-
         if ($data['name']) {
             if ($translations) {
                 $translations[$lang] = $data;
@@ -94,7 +98,7 @@ class PermissionController
             unset($translations[$lang]);
         }
         $permission->update(compact('translations'));
-        return 'success';
+        return $permission;
     }
 
     public function sync()

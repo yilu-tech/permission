@@ -10,93 +10,68 @@ trait HasChildRoles
     protected $MAX_LEVEL = 3;
 
     /**
-     * @return \Illuminate\Support\Collection
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
      */
-    public function childRoles()
+    public function childRoleRelation()
     {
-        return Helper::array_get($this->relations, 'childRoles', function () {
-            return $this->hasChild()
-                ? Role::query()->join('role_has_roles', 'roles.id', 'child_id')->where('role_id', $this->id)->get()
-                : collect([]);
-        });
+        return $this->belongsToMany(Role::class, 'role_has_roles', 'role_id', 'child_id');
     }
 
     /**
+     * @param $depth
      * @return \Illuminate\Support\Collection
      */
-    public function parentRoles()
+    public function childRoles($depth = 0)
     {
-        return Helper::array_get($this->relations, 'parentRoles', function () {
-            return $this->getLevel() < $this->MAX_LEVEL
-                ? Role::query()->join('role_has_roles', 'roles.id', 'child_id')->where('role_id', $this->id)->get()
-                : collect([]);
+        $roles = Helper::array_get($this->relations, 'childRoles', function () {
+            if (!$this->hasChild()) {
+                return collect();
+            }
+            $items = $this->childRoleRelation()->get();
+            if ($this->relationLoaded('pivot')) {
+                foreach ($items as $item) {
+                    $item->pivot->group = $this->pivot->group;
+                }
+            }
+            return $items;
         });
-    }
-
-    /**
-     * @return \Illuminate\Support\Collection
-     */
-    public function extendPermissions()
-    {
-        return Helper::array_get($this->relations, 'extendPermissions', function () {
-            return $this->childRoles()->flatMap(function ($role) {
-                return $role->extendPermissions();
-            })->unique('id');
-        });
-    }
-
-    /**
-     * @return \Illuminate\Support\Collection
-     */
-    public function allChildRoles()
-    {
-        $children = $this->childRoles();
-        return $children->merge($children->flatMap(function ($role) {
-            return $role->allChildRoles();
+        if ($depth == 0) {
+            return $roles;
+        }
+        return $roles->merge($roles->flatMap(function ($role) use ($depth) {
+            return $role->childRoles($depth - 1);
         }));
     }
 
-    /**
-     * @return \Illuminate\Support\Collection
-     */
-    public function allParentRoles()
+    public function hasChildRole($id): bool
     {
-        $parents = $this->parentRoles();
-        return $parents->merge($parents->flatMap(function ($role) {
-            return $role->allParentRoles();
-        }));
+        return $this->childRoles(INF)->contains('id', $id);
     }
 
-    public function hasChildRole($role): bool
+    public function hasAnyChildRoles(array $ids): bool
     {
-        return $this->allChildRoles()->contains('id', $this->getStoredRole($role)->id);
+        return !empty(array_intersect($ids, $this->childRoles(INF)->pluck('id')->all()));
     }
 
-    public function hasAnyChildRoles($roles): bool
+    public function hasAllChildRoles(array $ids): bool
     {
-        foreach ($roles as $role) {
-            if ($this->hasChildRole($role)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public function hasAllChildRoles($roles): bool
-    {
-        foreach ($roles as $role) {
-            if (!$this->hasChildRole($role)) {
-                return false;
-            }
-        }
-        return true;
+        return empty(array_diff($ids, $this->childRoles(INF)->pluck('id')->all()));
     }
 
     public function giveChildRoleTo($roles)
     {
-        collect($roles)->map(function ($role) {
-            return $this->getStoredRole($role);
-        })->unique('id')->each(function ($role) {
+        $roles = $this->parseRole($roles);
+
+        $attach = $roles->diffUsing($this->childRoles(), function ($a, $b) {
+            return $a->id - $b->id;
+        });
+
+        if ($attach->isEmpty()) {
+            return 0;
+        }
+
+        $relation = $this->childRoleRelation();
+        foreach ($attach as $role) {
             if ($role->id === $this->id) {
                 throw new \Exception('can not extend self');
             }
@@ -106,39 +81,66 @@ trait HasChildRoles
             if (!($role->status & RS_EXTEND)) {
                 throw new \Exception("can not extend role<{$role->name}>");
             }
-            if ($this->hasChildRole($role)) {
+            if ($this->hasChildRole($role->id)) {
                 throw new \Exception("role<{$role->name}> already exists");
             }
-            if ($role->hasChildRole($this)) {
+            if ($role->hasChildRole($role->id)) {
                 throw new \Exception('can not extend parent');
             }
             if ($role->getLevel() >= $this->MAX_LEVEL) {
                 throw new \Exception("can not extend role<{$role->name}> more than {$this->MAX_LEVEL} level");
             }
-        })->each(function ($role) {
-            \DB::table('role_has_roles')->insert(['role_id' => $this->id, 'child_id' => $role->id]);
-            $this->childRoles()->push($role);
-        });
-        return $this->unsetRelation('extendPermissions');
+            $relation->attach($role->id);
+
+            $role->setRelation('pivot', $relation->newExistingPivot());
+            $this->relations['childRoles']->push($role);
+        }
+        $this->status = $this->status | RS_EXTENDED;
+        $this->unsetRelation('permissions');
+        return $attach->count();
     }
 
     public function syncChildRoles($roles)
     {
-        return $this->revokeChildRoleTo()->giveChildRoleTo($roles);
+        $roles = $this->parseRole($roles);
+
+        if ($roles->isEmpty()) {
+            return $this->revokeChildRoleTo();
+        }
+
+        $current = $this->childRoles()->pluck('id')->all();
+
+        $detached = array_diff($current, $roles->pluck('id')->all());
+        if (count($detached)) {
+            $result = $this->revokeChildRoleTo($detached);
+        } else {
+            $result = 0;
+        }
+        return $result + $this->giveChildRoleTo($roles);
     }
 
-    public function revokeChildRoleTo($roles = null)
+    public function revokeChildRoleTo(array $roles = null)
     {
-        $query = \DB::table('role_has_roles')->where('role_id', $this->id);
-        if ($roles) {
-            $query->whereIn('child_id', collect($roles)->pluck('id'));
+        $result = $this->childRoleRelation()->detach($roles);
+        if ($result) {
+            if ($this->relationLoaded('childRoles') && $roles) {
+                $roles = $this->childRoles()->filter(function ($item) use ($roles) {
+                    if (is_array($roles)) {
+                        return !in_array($item->id, $roles);
+                    }
+                    return $item->id != $roles;
+                })->values();
+                $this->setRelation('childRoles', $roles);
+            }
+            if ($roles == null) {
+                $this->setRelation('childRoles', collect());
+            }
         }
-        $query->delete();
-
-        $childRoles = $roles ? $this->childRoles()->diffUsing($roles, function ($a, $b) {
-            return $a->id == $b->id ? 0 : -1;
-        }) : collect([]);
-        return $this->setRelation('childRoles', $childRoles)->unsetRelation('extendPermissions');
+        if ($this->childRoles()->isEmpty()) {
+            $this->status = $this->status & ~RS_EXTENDED;
+        }
+        $this->unsetRelation('permissions');
+        return $result;
     }
 
     public function getLevel()
@@ -156,18 +158,39 @@ trait HasChildRoles
         return $this->getOriginal('status') & RS_EXTENDED;
     }
 
-    protected function getStoredRole($role)
+    protected function parseRole($role)
     {
-        if (is_array($role)) {
-            return array_map([$this, 'getStoredRole'], $role);
+        if ($role instanceof Role) {
+            $role = [$role];
         }
-        if (is_numeric($role)) {
-            $role = Role::findById($role);
-        } elseif (is_string($role)) {
-            $role = Role::findByName($role);
+
+        $roles = collect($role);
+        $items = $roles->groupBy(function ($item) {
+            if (is_numeric($item)) {
+                return 'id';
+            }
+            if (is_string($item)) {
+                return 'name';
+            }
+            if ($item instanceof Role) {
+                return 'model';
+            }
+            return 'others';
+        });
+
+        $result = collect();
+        $group = $this->getAttributeFromArray('group');
+        if ($items->has('id')) {
+            $result = $result->merge(Role::findById($items['id'], $group));
         }
-        if ($role instanceof Role && ($role->group === $this->group || $role->group === strstr($this->group, ':', true))) {
-            return $role;
+        if ($items->has('name')) {
+            $result = $result->merge(Role::findByName($items['name'], $group));
+        }
+        if ($items->has('model')) {
+            $result = $result->merge($items['model']);
+        }
+        if ($result->count() === $roles->count()) {
+            return $result;
         }
         throw new \Exception('role not exists');
     }

@@ -69,7 +69,7 @@ class UserPermissionCache
         if ($this->user->hasAllRoles()) {
             $values['administrator'] = 1;
         }
-        foreach ($this->user->roles()->groupBy('group') as $group => $roles) {
+        foreach ($this->user->roles()->groupBy('pivot.group') as $group => $roles) {
             foreach ($roles as $role) {
                 if ($role->isAdministrator()) {
                     $values["$group:administrator"] = 1;

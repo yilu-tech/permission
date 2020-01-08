@@ -3,6 +3,7 @@
 namespace YiluTech\Permission\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use YiluTech\Permission\CacheManager;
 use YiluTech\Permission\Helper\RoleGroup;
 use YiluTech\Permission\Traits\HasChildRoles;
@@ -28,24 +29,40 @@ class Role extends Model
         });
     }
 
-    public static function findById(int $id, $group = false)
+    public static function findById($id, $group = false)
     {
-        return static::queryWithGroup($group)->find($id);
+        $query = static::group($group);
+        return is_array($id) || $id instanceof Collection ? $query->findMany($id) : $query->find($id);
     }
 
-    public static function findByName(string $name, $group = false)
+    public static function findByName($name, $group = false)
     {
-        return static::queryWithGroup($group)->where('alias', $name)->first();
+        $query = static::group($group);
+        return is_array($name) || $name instanceof Collection
+            ? $query->whereIn('alias', $name)->get()
+            : $query->where('alias', $name)->first();
     }
 
     public static function status($status, $group = false)
     {
-        return static::queryWithGroup($group)->where('roles.status', '&', $status);
+        return static::group($group)->where('roles.status', '&', $status);
     }
 
-    public static function queryWithGroup($group)
+    public static function group($group)
     {
-        return RoleGroup::bindQuery(static::query(), $group, 'roles.group');
+        if ($group === false) {
+            return static::query();
+        }
+        $group = RoleGroup::parse($group);
+        if (!$group['key']) {
+            return static::query()->whereNull('group');
+        }
+        if ($group['value'] === null) {
+            return static::query()->where('group', $group['key']);
+        }
+        return static::query()->where(function ($query) use ($group) {
+            $query->where('group', $group['key'])->orWhere('group', $group['key'] . ':' . $group['value']);
+        });
     }
 
     public function isAdministrator()
@@ -55,7 +72,7 @@ class Role extends Model
 
     public function groupInfo($name = null)
     {
-        $info = RoleGroup::parse($this->getAttribute('group'));
+        $info = RoleGroup::parse($this->getAttributeFromArray('group'));
         if ($info['scope'] === null) {
             $info['scope'] = RoleGroup::scope($info['key']);
         }

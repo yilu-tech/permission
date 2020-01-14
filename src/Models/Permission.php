@@ -11,6 +11,8 @@ class Permission extends Model
 
     protected $fillable = ['id', 'name', 'type', 'scopes', 'content', 'translations'];
 
+    public $timestamps = false;
+
     protected $casts = [
         'config' => 'json',
         'content' => 'json',

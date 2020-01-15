@@ -77,7 +77,7 @@ trait HasRoles
 
         $roles = $this->parseRole($roles, $group);
         if ($basic) {
-            $roles->merge(Role::status(RS_BASIC, $group)->get()->all())->unique('id');
+            $roles = $roles->merge(Role::status(RS_BASIC, $group)->get()->all())->unique('id');
         }
 
         $attach = $roles->diffUsing($this->roles($group), function ($a, $b) {

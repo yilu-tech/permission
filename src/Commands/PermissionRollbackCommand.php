@@ -14,7 +14,7 @@ class PermissionRollbackCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'permission:rollback {date} {--path=}';
+    protected $signature = 'permission:rollback {date?} {--path=}';
 
     /**
      * The console command description.
@@ -37,16 +37,14 @@ class PermissionRollbackCommand extends Command
         }
 
         $date = $this->argument('date');
-
-        if (strtolower($date) === 'null') {
-            $date = null;
-        } elseif (strtotime($date) === false) {
+        if ($date === 'all') {
+            $date = -1;
+        } elseif ($date && strtotime($date) === false) {
             $this->info('Date format error.');
             return;
         }
 
-        if ($count = count($manager->readFile($date))) {
-            $manager->rollbackChanges($date);
+        if ($count = $manager->rollback($date)) {
             $this->info("Rollback $count changes.");
         } else {
             $this->info('Nothing to rollback.');

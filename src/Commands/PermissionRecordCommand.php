@@ -14,7 +14,7 @@ class PermissionRecordCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'permission:record {--auth=*} {--db} {--path=} {--not-ignore}';
+    protected $signature = 'permission:record {--auth=*} {--path=} {--not-ignore}';
 
     /**
      * The console command description.
@@ -52,30 +52,10 @@ class PermissionRecordCommand extends Command
             $manager->setFilePath($path);
         }
 
-        $this->option('db')
-            ? $this->saveChanges($manager)
-            : $this->writeChanges($manager);
-    }
-
-    protected function writeChanges(PermissionManager $manager)
-    {
-        $changes = $manager->getChanges($manager->old());
-        if ($count = count($changes)) {
-            $manager->writeFile($changes);
+        if ($count = $manager->record()) {
             $this->info("Write $count changes.");
         } else {
             $this->info('Nothing to write.');
-        }
-    }
-
-    protected function saveChanges(PermissionManager $manager)
-    {
-        $changes = $manager->readFile($manager->getLastUpdateTime());
-        if ($count = count($changes)) {
-            $manager->writeDB($changes);
-            $this->info("Save $count changes.");
-        } else {
-            $this->info('Nothing to save.');
         }
     }
 }

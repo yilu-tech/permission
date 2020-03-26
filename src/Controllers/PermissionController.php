@@ -110,9 +110,9 @@ class PermissionController
         $manager = new PermissionManager(\Request::input('server'));
         switch (\Request::input('action')) {
             case 'getLastUpdateTime':
-                return $manager->getLastUpdateTime();
+                return $manager->localStore()->getLastUpdateTime();
             case 'update':
-                $manager->writeDB(\Request::input('changes'));
+                $manager->localStore()->saveChanges(\Request::input('changes'));
                 return 'SUCCESS';
             default:
                 return 'FAIL';

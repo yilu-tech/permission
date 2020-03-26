@@ -1,7 +1,11 @@
 <?php
 
 return [
-    // 'remote' => '',
+    // 'remote' => [
+    //     'scope|scope|...' => 'address'
+    // ]
+
+    // 'local' => 'scopes',
 
     // 'server' => '',
 

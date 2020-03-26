@@ -42,6 +42,7 @@ class PermissionServiceProvider extends ServiceProvider
             $this->commands([
                 \YiluTech\Permission\Commands\MakeRoleCommand::class,
                 \YiluTech\Permission\Commands\PermissionRecordCommand::class,
+                \YiluTech\Permission\Commands\PermissionMigrateCommand::class,
                 \YiluTech\Permission\Commands\PermissionRollbackCommand::class,
             ]);
 

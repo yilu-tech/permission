@@ -4,13 +4,10 @@
 namespace YiluTech\Permission;
 
 use Illuminate\Support\Arr;
+use YiluTech\Permission\Helper\Helper;
 
 class PermissionManager
 {
-    public $filter;
-
-    protected $items;
-
     protected $server;
 
     protected $logger;
@@ -18,6 +15,8 @@ class PermissionManager
     protected $config;
 
     protected $stores;
+
+    protected $scopes;
 
     public function __construct($server = null)
     {
@@ -37,13 +36,7 @@ class PermissionManager
 
     public function all()
     {
-        if (!$this->items) {
-            $this->items = $this->format(RoutePermission::all());
-        }
-        if (!$this->filter) {
-            return $this->items;
-        }
-        return array_filter($this->items, $this->filter);
+        return $this->format(RoutePermission::all());
     }
 
     public function localStore()
@@ -124,43 +117,52 @@ class PermissionManager
     protected function initStores()
     {
         $this->stores = [];
-        $scopes = [];
-        if ($remote = $this->config('remote')) {
+        if (!empty($remote = $this->config('remote'))) {
             if (is_array($remote)) {
                 foreach ($remote as $key => $value) {
-                    if (is_integer($key)) {
-                        $this->stores[] = ['scopes' => ['*'], 'url' => $value];
-                    } else {
-                        $this->stores[] = ['scopes' => $this->parseScope($key, $scopes), 'url' => $value];
-                    }
+                    $scopes = $key == '*' ? $key : explode('|', $key);
+                    $this->stores[] = ['scopes' => $scopes, 'url' => $value];
                 }
             } else {
-                $this->stores[] = ['scopes' => ['*'], 'url' => $remote];
+                $this->stores[] = ['scopes' => '*', 'url' => $remote];
             }
         }
         if ($local = $this->config('local')) {
-            $this->stores['local'] = ['scopes' => $this->parseScope($local, $scopes)];
+            $this->stores['local'] = ['scopes' => $local == '*' ? $local : explode('|', $local)];
         } elseif (!$remote) {
-            $this->stores['local'] = ['scopes' => ['*']];
+            $this->stores['local'] = ['scopes' => '*'];
+        }
+
+        $this->scopes = [];
+        foreach ($this->stores as $store) {
+            if ($store['scopes'] === '*') {
+                $this->scopes = '*';
+                break;
+            } else {
+                $this->scopes = array_merge($this->scopes, $store['scopes']);
+            }
+        }
+
+        if ($this->scopes !== '*') {
+            $this->scopes = array_unique($this->scopes);
         }
     }
 
-    protected function parseScope($scope, &$scopes)
+    protected function filter($item)
     {
-        if ($scope === '*') {
-            return ['*'];
+        if (!empty($item['content']['rbac_ignore'])) {
+            return false;
         }
-        if ($scope === '^') {
-            return [&$scopes, true];
+        if ($this->scopes === '*') {
+            return true;
         }
-        $items = explode('|', $scope);
-        $scopes = array_merge($scopes, $items);
-        return [$items];
+        $intersect = array_uintersect($item['scopes'], $this->scopes, [Helper::class, 'scope_differ']);
+        return !empty($intersect);
     }
 
     protected function store($config)
     {
-        $scopes = array_merge([$this->serverScopeName()], $config['scopes']);
+        $scopes = [$this->serverScopeName(), $config['scopes']];
         if (empty($config['url'])) {
             return new LocalRepository($this->logger, $scopes);
         }
@@ -178,7 +180,10 @@ class PermissionManager
                 default:
                     break;
             }
-            $data[$item['name']] = $item;
+
+            if ($this->filter($item)) {
+                $data[$item['name']] = $item;
+            }
         }
         return $data;
     }

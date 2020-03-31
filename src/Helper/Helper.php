@@ -41,4 +41,21 @@ class Helper
         return $j === count($units);
     }
 
+
+    public static function scope_differ($a, $b)
+    {
+        if ($a1 = $a[0] === '@') {
+            $a = substr($a, 1);
+        }
+        if ($b1 = $b[0] === '@') {
+            $b = substr($b, 1);
+        }
+        if ($a1 === $b1) {
+            return $a === $b ? 0 : ($a < $b ? -1 : 1);
+        }
+        if ($a1) {
+            return strpos($b, $a) === 0 ? 0 : ($a < $b ? -1 : 1);
+        }
+        return strpos($a, $b) === 0 ? 0 : ($a < $b ? -1 : 1);
+    }
 }

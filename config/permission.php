@@ -2,10 +2,12 @@
 
 return [
     // 'remote' => [
-    //     'scope|scope|...' => 'address'
-    // ]
+    //     '@admin' => 'http://examlple/admin'
+    // ],
 
-    // 'local' => 'scopes',
+    // 'local' => '*',
+
+    // 'local' => '*',
 
     // 'server' => '',
 

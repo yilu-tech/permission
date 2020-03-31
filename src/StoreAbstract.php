@@ -4,7 +4,7 @@
 namespace YiluTech\Permission;
 
 
-use YiluTech\Permission\Models\Permission;
+use YiluTech\Permission\Helper\Helper;
 
 abstract class StoreAbstract
 {
@@ -55,11 +55,11 @@ abstract class StoreAbstract
     {
         [$items, $changes] = $this->logger->read($start, $end);
 
-        if (empty($changes) || $this->scopes[1] === '*') {
+        if (empty($changes) || $this->scopes === '*') {
             return $changes;
         }
 
-        if ($this->scopes[1] !== '*') {
+        if ($this->scopes !== '*') {
             $changes = array_filter(array_map(function ($item) use (&$items) {
                 return $this->check($items[$item['name']] ?? null, $item);
             }, $changes));
@@ -74,10 +74,7 @@ abstract class StoreAbstract
 
     public function exists($scopes)
     {
-        if (empty($this->scopes[2])) {
-            return !empty(array_intersect($this->scopes[1], $scopes));
-        }
-        return array_diff($scopes, $this->scopes[1]) != [$this->serverScopeName()];
+        return !empty(array_uintersect($this->scopes[1], $scopes, [Helper::class, 'scope_differ']));
     }
 
     protected function flip($changes, $items)

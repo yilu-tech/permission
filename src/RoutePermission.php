@@ -27,7 +27,7 @@ class RoutePermission
             $auth = $parts[0];
             $name = $parts[1];
 
-            $rbac_ignore = $name{0} === '!';
+            $rbac_ignore = $name[0] === '!';
 
             if ($rbac_ignore) {
                 $name = substr($name, 1);

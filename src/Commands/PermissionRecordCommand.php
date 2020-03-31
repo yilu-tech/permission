@@ -32,22 +32,6 @@ class PermissionRecordCommand extends Command
     {
         $manager = new PermissionManager();
 
-        $filter = null;
-        if (!$this->option('not-ignore')) {
-            $filter = function ($item) {
-                return empty($item['content']['rbac_ignore']);
-            };
-        }
-        if (count($auth = $this->option('auth'))) {
-            $differ = function ($a, $b) {
-                return ($a == $b || strpos($b, "$a.") === 0) ? 0 : 1;
-            };
-            $filter = function ($item) use ($differ, $auth, $filter) {
-                return count(array_uintersect($auth, $item['scopes'], $differ)) && (!$filter || $filter($item));
-            };
-        }
-        $manager->filter = $filter;
-
         if ($path = $this->option('path')) {
             $manager->setFilePath($path);
         }

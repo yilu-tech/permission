@@ -5,6 +5,7 @@ namespace YiluTech\Permission\Traits;
 use Illuminate\Support\Facades\Auth;
 use YiluTech\Permission\Helper\Helper;
 use YiluTech\Permission\Helper\RoleGroup;
+use YiluTech\Permission\PermissionException;
 use YiluTech\Permission\UserPermissionCache;
 use YiluTech\Permission\Models\Role;
 
@@ -127,7 +128,7 @@ trait HasRoles
     public function revokeRoleTo($roles = null, $group = false, $fireEvent = true)
     {
         if ($this->checkAuthorizer()) {
-            throw new \Exception('can not revoke self roles.');
+            throw new PermissionException('Can not revoke self roles.');
         }
 
         $relation = $this->roleRelation();
@@ -206,7 +207,7 @@ trait HasRoles
     protected function validateAuthorizer()
     {
         if ($this->checkAuthorizer()) {
-            throw new \Exception('can not give role to self.');
+            throw new PermissionException('Can not give role to self.');
         }
     }
 
@@ -243,7 +244,7 @@ trait HasRoles
         if ($result->count() === $roles->count()) {
             return $result;
         }
-        throw new \Exception('role not exists');
+        throw new PermissionException('Role not exists.');
     }
 
     protected function makeRoleGroup($role)

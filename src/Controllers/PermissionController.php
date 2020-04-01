@@ -10,6 +10,7 @@ namespace YiluTech\Permission\Controllers;
 
 use YiluTech\Permission\Models\Permission;
 use YiluTech\Permission\Models\Role;
+use YiluTech\Permission\PermissionException;
 use YiluTech\Permission\PermissionManager;
 
 class PermissionController
@@ -19,7 +20,7 @@ class PermissionController
         if ($role_id = (int)\Request::input('role_id')) {
             $role = Role::findById($role_id);
             if (!$role) {
-                throw new \Exception('Role not found');
+                throw new PermissionException('Role not exists.');
             }
             if (\Request::has('with_child')) {
                 return $role->permissions();
@@ -47,7 +48,7 @@ class PermissionController
     public function update()
     {
         $permission = Permission::findById(\Request::input('permission_id'));
-        if (!$permission) throw new \Exception('permission not exists');
+        if (!$permission) throw new PermissionException('permission not exists.');
         $data = \Request::input();
         \Request::validate([
             'name' => ['required', 'string', 'max:40', 'regex:/^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*$/', 'unique:permissions,name,' . $data['permission_id']],
@@ -80,7 +81,7 @@ class PermissionController
 
         $permission = Permission::query(false, false)->where('name', \Request::input('name'))->first();
         if (!$permission) {
-            throw new \Exception('Permission not found');
+            throw new PermissionException('Permission not exists.');
         }
         $lang = \Request::input('lang');
         $data = [

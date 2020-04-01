@@ -12,6 +12,7 @@ use Illuminate\Validation\Rule;
 use YiluTech\Permission\CacheManager;
 use YiluTech\Permission\Helper\RoleGroup;
 use YiluTech\Permission\Models\Role;
+use YiluTech\Permission\PermissionException;
 
 class RoleController
 {
@@ -83,16 +84,16 @@ class RoleController
         ]);
 
         $role = Role::findById(\Request::input('role_id'), $group);
-        if (!$role) throw new \Exception('Role not found.');
+        if (!$role) throw new PermissionException('Role not exists.');
 
         if (!($role->status & RS_WRITE)) {
-            throw new \Exception('Role not allow edit.');
+            throw new PermissionException('Role not allow edit.');
         }
 
         $data = \Request::only(['name', 'description', 'config', 'roles', 'permissions']);
 
         if ($role->status & RS_SYS && !empty($data['roles'])) {
-            throw new \Exception('system role can not extend other role.');
+            throw new PermissionException('System role can not extend other roles.');
         }
 
         return \DB::transaction(function () use ($role, $data) {
@@ -111,10 +112,10 @@ class RoleController
         \Request::validate(['role_id' => 'required|integer']);
 
         $role = Role::findById(\Request::input('role_id'), RoleGroup::getFromQuery());
-        if (!$role) throw new \Exception('role not found');
+        if (!$role) throw new PermissionException('Role not exists.');
 
         if ($role->status & RS_SYS) {
-            throw new \Exception('can not remove');
+            throw new PermissionException('Can not remove system role.');
         }
 
         return \DB::transaction(function () use ($role) {

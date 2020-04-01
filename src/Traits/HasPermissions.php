@@ -4,6 +4,7 @@ namespace YiluTech\Permission\Traits;
 
 use YiluTech\Permission\Helper\Helper;
 use YiluTech\Permission\Models\Permission;
+use YiluTech\Permission\PermissionException;
 
 trait HasPermissions
 {
@@ -135,7 +136,7 @@ trait HasPermissions
     {
         $bool = ($this->status & RS_WRITE) === RS_WRITE;
         if (!$bool && $throw) {
-            throw new \Exception("Role<{$this->name}> not allow change.");
+            throw new PermissionException('Role not allow edit.');
         }
         return $bool;
     }
@@ -157,7 +158,7 @@ trait HasPermissions
             }
             if ($item instanceof Permission) {
                 if ($scope && !in_array($scope, $item->scopes)) {
-                    throw new \Exception('Permission not in role scope');
+                    throw new PermissionException('Permission not in role scopes.');
                 }
                 return 'model';
             }
@@ -177,6 +178,6 @@ trait HasPermissions
         if ($result->count() === $permissions->count()) {
             return $result;
         }
-        throw new \Exception('Permission not exists');
+        throw new PermissionException('Permission not exists.');
     }
 }

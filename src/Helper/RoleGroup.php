@@ -4,6 +4,8 @@
 namespace YiluTech\Permission\Helper;
 
 
+use YiluTech\Permission\PermissionException;
+
 class RoleGroup
 {
     public static function config($name = null, $default = null)
@@ -16,7 +18,7 @@ class RoleGroup
     {
         if (!\Request::has($name)) {
             if (static::config('required', false)) {
-                throw new \Exception("Role group<$name> required.");
+                throw new PermissionException('Role group :name required.', ['name' => $name]);
             }
             return false;
         }
@@ -86,7 +88,7 @@ class RoleGroup
         }
 
         if (!$value || ($isHeader && !\Request::hasHeader($value)) || !\Request::has($value)) {
-            throw new \Exception("Role group<$group> value<$value> required.");
+            throw new PermissionException("Role group :name value :value required.", ['name' => $group, 'value' => $value]);
         }
 
         return $isHeader ? \Request::header($value) : \Request::input($value);

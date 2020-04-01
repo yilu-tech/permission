@@ -4,6 +4,7 @@ namespace YiluTech\Permission\Traits;
 
 use YiluTech\Permission\Helper\Helper;
 use YiluTech\Permission\Models\Role;
+use YiluTech\Permission\PermissionException;
 
 trait HasChildRoles
 {
@@ -73,22 +74,25 @@ trait HasChildRoles
         $relation = $this->childRoleRelation();
         foreach ($attach as $role) {
             if ($role->id === $this->id) {
-                throw new \Exception('can not extend self');
+                throw new PermissionException('Can not extend self.');
             }
             if ($role->isAdministrator()) {
-                throw new \Exception('can not extend administrator');
+                throw new PermissionException('Can not extend administrator.');
             }
             if (!($role->status & RS_EXTEND)) {
-                throw new \Exception("can not extend role<{$role->name}>");
+                throw new PermissionException('Can not extend role :name .', ['name' => $role->name]);
             }
             if ($this->hasChildRole($role->id)) {
-                throw new \Exception("role<{$role->name}> already exists");
+                throw new PermissionException('Role :name already exists.', ['name' => $role->name]);
             }
             if ($role->hasChildRole($role->id)) {
-                throw new \Exception('can not extend parent');
+                throw new PermissionException('Can not extend parent.');
             }
             if ($role->getLevel() >= $this->MAX_LEVEL) {
-                throw new \Exception("can not extend role<{$role->name}> more than {$this->MAX_LEVEL} level");
+                throw new PermissionException('More than :max_level level when extend role :name', [
+                    'name' => $role->name,
+                    'max_level' => $this->MAX_LEVEL
+                ]);
             }
             $relation->attach($role->id);
 
@@ -192,6 +196,6 @@ trait HasChildRoles
         if ($result->count() === $roles->count()) {
             return $result;
         }
-        throw new \Exception('role not exists');
+        throw new PermissionException('Role not exists.');
     }
 }

@@ -65,6 +65,9 @@ class PermissionManager
     public function record()
     {
         $old = array_map(function ($item) {
+            if ($item['action'] !== 'CREATE') {
+                throw new PermissionException('Permission[:name] recorded error.', ['name' => $item['name']]);
+            }
             return $item['data'];
         }, $this->logger->read()[1]);
 
@@ -120,7 +123,7 @@ class PermissionManager
         if (!empty($remote = $this->config('remote'))) {
             if (is_array($remote)) {
                 foreach ($remote as $key => $value) {
-                    $scopes = $key == '*' ? $key : explode('|', $key);
+                    $scopes = ($key === '*' || is_integer($key)) ? '*' : explode('|', $key);
                     $this->stores[] = ['scopes' => $scopes, 'url' => $value];
                 }
             } else {

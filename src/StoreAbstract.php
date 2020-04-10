@@ -55,11 +55,11 @@ abstract class StoreAbstract
     {
         [$items, $changes] = $this->logger->read($start, $end);
 
-        if (empty($changes) || $this->scopes === '*') {
+        if (empty($changes) || $this->scopes[1] === '*') {
             return $changes;
         }
 
-        if ($this->scopes !== '*') {
+        if ($this->scopes[1] !== '*') {
             $changes = array_filter(array_map(function ($item) use (&$items) {
                 return $this->check($items[$item['name']] ?? null, $item);
             }, $changes));

@@ -107,8 +107,8 @@ abstract class StoreAbstract
             return $this->exists($item['scopes']) ? $change : null;
         }
 
-        $newState = $this->exists($change['data']['scopes']);
         $oldState = $this->exists($item['scopes']);
+        $newState = isset($change['data']['scopes']) ? $this->exists($change['data']['scopes']) : $oldState;
 
         if ($oldState) {
             if (!$newState) {

@@ -197,14 +197,11 @@ class PermissionManager
             'name' => $item['name'],
             'type' => $item['type'],
             'scopes' => [],
-            'content' => [
-                'url' => $item['path'],
-                'method' => $item['method']
-            ]
+            'content' => ['url' => $item['path'], 'method' => $item['method']]
         ];
 
         if ($scope = $this->serverScopeName()) {
-            array_unshift($data['scopes'], $scope);
+            $data['scopes'][] = $scope;
         }
 
         if (!empty($item['rbac_ignore'])) {
@@ -217,18 +214,28 @@ class PermissionManager
             foreach ($item['auth'] as $auth) {
                 $data['scopes'] = array_merge($data['scopes'], $this->parseRouteScope($auth));
             }
+            usort($data['scopes'], [$this, 'scopeSortCmp']);
         }
         return $config ? $this->mergeRouteConfig($config, $data) : $data;
     }
 
     protected function mergeRouteConfig($config, $_)
     {
-        $config['scopes'] = array_values(array_unique(array_merge($config['scopes'], $_['scopes'])));
+        $config['scopes'] = array_unique(array_merge($config['scopes'], $_['scopes']));
+        usort($config['scopes'], [$this, 'scopeSortCmp']);
+
         if (empty($config['content']) || Arr::isAssoc($config['content'])) {
-            $config['content'] = [$config['content'], $_['content']];
-        } else {
-            $config['content'][] = $_['content'];
+            $config['content'] = [$config['content']];
         }
+
+        foreach ($config['content'] as $index => $item) {
+            if ($item['path'] > $_['content']['path']) {
+                array_splice($config['content'], $index, 0, [$_['content']]);
+                return $config;
+            }
+        }
+
+        $config['content'][] = $_['content'];
         return $config;
     }
 
@@ -243,5 +250,19 @@ class PermissionManager
             $scopes[] = $item && $item !== 'default' ? "{$parts[0]}.$item" : $parts[0];
         }
         return $scopes;
+    }
+
+    protected function scopeSortCmp($a, $b)
+    {
+        if ($a === $b) {
+            return 0;
+        }
+        if ($a[0] === '_' && $b[0] !== '_') {
+            return -1;
+        }
+        if ($b[0] === '_' && $a[0] !== '_') {
+            return 1;
+        }
+        return $a < $b ? -1 : 1;
     }
 }

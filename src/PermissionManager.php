@@ -229,7 +229,7 @@ class PermissionManager
         }
 
         foreach ($config['content'] as $index => $item) {
-            if ($item['path'] > $_['content']['path']) {
+            if ($item['url'] > $_['content']['url']) {
                 array_splice($config['content'], $index, 0, [$_['content']]);
                 return $config;
             }

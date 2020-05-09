@@ -4,6 +4,13 @@
 namespace YiluTech\Permission;
 
 
+use YiluTech\Permission\Store\AppendAction;
+use YiluTech\Permission\Store\CreateAction;
+use YiluTech\Permission\Store\DeleteAction;
+use YiluTech\Permission\Store\Recorder;
+use YiluTech\Permission\Store\RemoveAction;
+use YiluTech\Permission\Store\UpdateAction;
+
 class LoggerRepository
 {
     private $path;
@@ -29,28 +36,29 @@ class LoggerRepository
         return $this->path;
     }
 
-    public function read($start = null, $end = null)
+    public function read($start = null, $end = null, $scopes = null)
     {
         $path = $this->getPath();
-
-        $items = $changes = [];
+        $recorder = new Recorder($scopes);
         if (file_exists($path)) {
             $fs = fopen($path, 'r');
             while (!feof($fs)) {
                 $row = trim(fgets($fs));
                 if (!$row) continue;
-                $item = $this->parseLine($row);
 
-                if ($start && ($item['date'] < $start || ($item['date'] === $start && $start !== $end))) {
-                    $this->mergeData($items, $item);
+                $action = $this->parseLine($row);
+
+                if ($start && ($action->date < $start || ($action->date === $start && $start !== $end))) {
+                    $recorder->call($action);
                     continue;
                 }
-                if ($end && $item['date'] > $end) break;
-                $this->mergeAction($changes, $item);
+
+                if ($end && $action->date > $end) break;
+                $recorder->record($action);
             }
             fclose($fs);
         }
-        return [$items, $changes];
+        return $recorder;
     }
 
     public function write($changes)
@@ -60,68 +68,44 @@ class LoggerRepository
         }
         $date = date('Y-m-d H:i:s');
         $fs = fopen($this->getPath(), 'a');
-        foreach ($changes as $key => $item) {
-            fwrite($fs, $this->formatLine($date, $item['action'], $key, $item['data']));
+        foreach ($changes as $change) {
+            fwrite($fs, $this->formatLine($date, $change));
         }
         fclose($fs);
     }
 
-    protected function mergeData(&$items, $item)
+    protected function formatLine($date, $change)
     {
-        if (isset($items[$item['name']])) {
-            if ($item['action'] === 'DELETE') {
-                unset($items[$item['name']]);
-            } else {
-                $items[$item['name']] = array_merge($items[$item['name']], $item['data']);
-                $items[$item['name']]['date'] = $item['date'];
-            }
-        } elseif ($item['action'] !== 'DELETE') {
-            $items[$item['name']] = $item['data'];
-            $items[$item['name']]['date'] = $item['date'];
-        }
-    }
-
-    protected function mergeAction(&$changes, $change)
-    {
-        if (isset($changes[$change['name']])) {
-            $origin = &$changes[$change['name']];
-            if ($change['action'] === 'UPDATE') {
-                $origin['data'] = array_merge($origin['data'], $change['data']);
-                $origin['date'] = $change['date'];
-            } else {
-                if ($origin['action'] === 'CREATE') {
-                    unset($changes[$change['name']]);
-                } else {
-                    $origin = $change;
-                }
-            }
-        } else {
-            $changes[$change['name']] = $change;
-        }
-    }
-
-    protected function formatLine($date, $action, $name, $data = null)
-    {
-        $str = "[$date] $action: $name";
-        if ($data) {
-            $str .= ' > ' . json_encode($data);
+        $str = "[$date] {$change['action']}: {$change['name']}";
+        if (!empty($change['data'])) {
+            $str .= ' > ' . json_encode($change['data']);
         }
         return $str . PHP_EOL;
     }
 
-    protected function parseLine($str)
+    protected function parseLine($line)
     {
-        $item['date'] = substr($str, 1, 19);
+        preg_match('/^(?:\[([\d\s:-]{19})])(?:\s(\w+):)(?:\s([\w.-]+))(?:\s>\s(.+))?$/', $line, $match);
 
-        $parts = explode(':', substr($str, 21), 2);
-        $item['action'] = trim($parts[0]);
-
-        $parts = explode('>', $parts[1], 2);
-        $item['name'] = trim($parts[0]);
-
-        if (!empty($parts[1])) {
-            $item['data'] = json_decode($parts[1], JSON_OBJECT_AS_ARRAY);
+        if (empty($match[4])) {
+            $data = null;
+        } else {
+            $data = json_decode($match[4], JSON_OBJECT_AS_ARRAY);
         }
-        return $item;
+
+        switch ($match[2]) {
+            case 'CREATE':
+                return new CreateAction($match[3], $match[1], $data);
+            case 'UPDATE':
+                return new UpdateAction($match[3], $match[1], $data);
+            case 'DELETE':
+                return new DeleteAction($match[3], $match[1], $data);
+            case 'APPEND':
+                return new AppendAction($match[3], $match[1], $data);
+            case 'REMOVE':
+                return new RemoveAction($match[3], $match[1], $data);
+            default:
+                return null;
+        }
     }
 }

@@ -64,18 +64,11 @@ class PermissionManager
 
     public function record()
     {
-        $old = array_map(function ($item) {
-            if ($item['action'] !== 'CREATE') {
-                throw new PermissionException('Permission[:name] recorded error.', ['name' => $item['name']]);
-            }
-            return $item['data'];
-        }, $this->logger->read()[1]);
+        $recorder = $this->logger->read(INF);
 
-        $changes = $this->getChanges($old);
+        $changes = $recorder->diff($this->all());
 
-        if (!empty($changes)) {
-            $this->logger->write($changes);
-        }
+        $this->logger->write($changes);
         return count($changes);
     }
 
@@ -83,30 +76,6 @@ class PermissionManager
     {
         $this->logger->setPath($path);
         return $this;
-    }
-
-    public function getChanges(array $old, $new = null)
-    {
-        if (!$new) {
-            $new = $this->all();
-        }
-        $differ = function ($a, $b) {
-            return $a == $b ? 0 : 1;
-        };
-        $changes = [];
-        foreach (array_udiff_assoc($new, $old, $differ) as $key => $item) {
-            if (isset($old[$key])) {
-                $changes[$key] = ['action' => 'UPDATE', 'data' => array_udiff_assoc($item, $old[$key], $differ)];
-            } else {
-                $changes[$key] = ['action' => 'CREATE', 'data' => $item];
-            }
-        }
-        foreach (array_udiff_assoc($old, $new, $differ) as $key => $item) {
-            if (empty($new[$key])) {
-                $changes[$key] = ['action' => 'DELETE', 'data' => null];
-            }
-        }
-        return $changes;
     }
 
     public function serverScopeName()
@@ -156,11 +125,7 @@ class PermissionManager
         if (!empty($item['content']['rbac_ignore'])) {
             return false;
         }
-        if ($this->scopes === '*') {
-            return true;
-        }
-        $intersect = array_uintersect($item['scopes'], $this->scopes, [Helper::class, 'scope_differ']);
-        return !empty($intersect);
+        return Helper::scope_exists($item['scopes'], $this->scopes);
     }
 
     protected function store($config)
@@ -183,15 +148,19 @@ class PermissionManager
                 default:
                     break;
             }
-
-            if ($this->filter($item)) {
+            if (!$this->filter($item)) {
+                continue;
+            }
+            if (isset($data[$item['name']])) {
+                $data[$item['name']] = $this->mergeRouteConfig($data[$item['name']], $item);
+            } else {
                 $data[$item['name']] = $item;
             }
         }
         return $data;
     }
 
-    protected function routeFormatter($item, $config = null)
+    protected function routeFormatter($item)
     {
         $data = [
             'name' => $item['name'],
@@ -214,28 +183,41 @@ class PermissionManager
             foreach ($item['auth'] as $auth) {
                 $data['scopes'] = array_merge($data['scopes'], $this->parseRouteScope($auth));
             }
-            usort($data['scopes'], [$this, 'scopeSortCmp']);
+            usort($data['scopes'], [Helper::class, 'scope_cmp']);
         }
-        return $config ? $this->mergeRouteConfig($config, $data) : $data;
+        return $data;
     }
 
-    protected function mergeRouteConfig($config, $_)
+    protected function mergeRouteConfig($config, $item)
     {
-        $config['scopes'] = array_unique(array_merge($config['scopes'], $_['scopes']));
-        usort($config['scopes'], [$this, 'scopeSortCmp']);
-
-        if (empty($config['content']) || Arr::isAssoc($config['content'])) {
-            $config['content'] = [$config['content']];
+        if (isset($config['scopes'])) {
+            if ($config['scopes'] === $item['scopes']) {
+                return $this->mergeConfigContent($config, $item);
+            }
+            return [$config, $item];
         }
-
-        foreach ($config['content'] as $index => $item) {
-            if ($item['url'] > $_['content']['url']) {
-                array_splice($config['content'], $index, 0, [$_['content']]);
+        foreach ($config as $index => $value) {
+            if ($value['scopes'] === $item['scopes']) {
+                $config[$index] = $this->mergeConfigContent($value, $item);
                 return $config;
             }
         }
+        $config[] = $item;
+        return $config;
+    }
 
-        $config['content'][] = $_['content'];
+    protected function mergeConfigContent($config, $item)
+    {
+        if (empty($config['content'][0])) {
+            $config['content'] = [$config['content']];
+        }
+        foreach ($config['content'] as $index => $value) {
+            if ($value['url'] > $item['content']['url']) {
+                array_splice($config['content'], $index, 0, [$item['content']]);
+                return $config;
+            }
+        }
+        $config['content'][] = $item['content'];
         return $config;
     }
 
@@ -250,19 +232,5 @@ class PermissionManager
             $scopes[] = $item && $item !== 'default' ? "{$parts[0]}.$item" : $parts[0];
         }
         return $scopes;
-    }
-
-    protected function scopeSortCmp($a, $b)
-    {
-        if ($a === $b) {
-            return 0;
-        }
-        if ($a[0] === '_' && $b[0] !== '_') {
-            return -1;
-        }
-        if ($b[0] === '_' && $a[0] !== '_') {
-            return 1;
-        }
-        return $a < $b ? -1 : 1;
     }
 }

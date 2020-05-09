@@ -41,21 +41,39 @@ class Helper
         return $j === count($units);
     }
 
-
-    public static function scope_differ($a, $b)
+    public static function scope_cmp($a, $b)
     {
-        if ($a1 = $a[0] === '@') {
-            $a = substr($a, 1);
+        if ($a === $b) {
+            return 0;
         }
-        if ($b1 = $b[0] === '@') {
-            $b = substr($b, 1);
+        if ($a[0] === '_' && $b[0] !== '_') {
+            return -1;
         }
-        if ($a1 === $b1) {
-            return $a === $b ? 0 : ($a < $b ? -1 : 1);
+        if ($b[0] === '_' && $a[0] !== '_') {
+            return 1;
         }
-        if ($a1) {
-            return strpos($b, $a) === 0 ? 0 : ($a < $b ? -1 : 1);
+        return $a < $b ? -1 : 1;
+    }
+
+    public static function scope_exists($scopes, $needle)
+    {
+        if ($needle === '*') {
+            return true;
         }
-        return strpos($a, $b) === 0 ? 0 : ($a < $b ? -1 : 1);
+        return !empty(array_uintersect($needle, $scopes, function ($a, $b) {
+            if ($a1 = $a[0] === '@') {
+                $a = substr($a, 1);
+            }
+            if ($b1 = $b[0] === '@') {
+                $b = substr($b, 1);
+            }
+            if ($a1 === $b1) {
+                return $a === $b ? 0 : ($a < $b ? -1 : 1);
+            }
+            if ($a1) {
+                return strpos($b, $a) === 0 ? 0 : ($a < $b ? -1 : 1);
+            }
+            return strpos($a, $b) === 0 ? 0 : ($a < $b ? -1 : 1);
+        }));
     }
 }

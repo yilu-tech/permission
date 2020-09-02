@@ -20,6 +20,23 @@ class Permission extends Model
         'translations' => 'json'
     ];
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::created(function ($model) {
+            PermissionLog::insert($model->name, 'create');
+        });
+
+        static::updated(function ($model) {
+            PermissionLog::insert($model->name, 'update', $model->getDirty());
+        });
+
+        static::deleted(function ($model) {
+            PermissionLog::insert($model->name, 'delete');
+        });
+    }
+
     public static function query($scope = false, $lang = null, $query = null)
     {
         if (!$query) {

@@ -6,37 +6,33 @@ namespace YiluTech\Permission;
 
 use GuzzleHttp\Client;
 
-class RemoteRepository extends StoreAbstract
+class RemoteRepository
 {
     protected $url;
 
     protected $server;
 
-    public function __construct($logger, $scopes, $url, $server)
+    public function __construct($server, $url)
     {
-        parent::__construct($logger, $scopes);
         $this->url = $url . '/permission/sync';
         $this->server = $server;
     }
 
-    public function getLastUpdateTime()
+    public function sync($data)
     {
-        return $this->call('getLastUpdateTime');
+        return $this->call('sync', compact('data'));
     }
 
-    public function saveChanges($changes)
+    public function getChanges($data)
     {
-        if (empty($changes)) {
-            return 0;
-        }
-        $this->call('update', compact('changes'));
-        return count($changes);
+        return $this->call('getChanges', compact('data'));
     }
 
     protected function call($cation, $options = [])
     {
         $options['action'] = $cation;
         $options['server'] = $this->server;
-        return (new Client)->post($this->url, ['json' => $options])->getBody()->getContents();
+        $content = (new Client)->post($this->url, ['json' => $options])->getBody()->getContents();
+        return json_decode($content, true);
     }
 }

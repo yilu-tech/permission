@@ -41,17 +41,16 @@ class PermissionServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 \YiluTech\Permission\Commands\MakeRoleCommand::class,
-                \YiluTech\Permission\Commands\PermissionRecordCommand::class,
-                \YiluTech\Permission\Commands\PermissionMigrateCommand::class,
-                \YiluTech\Permission\Commands\PermissionRollbackCommand::class,
+                \YiluTech\Permission\Commands\PermissionSyncCommand::class,
+                \YiluTech\Permission\Commands\PermissionDiffCommand::class,
+                \YiluTech\Permission\Commands\MakePermissionTranslationCommand::class,
             ]);
-
             $this->offerPublishing();
         }
 
-        if (!$this->app['config']['permission.remote']) {
-            $this->registerRoute();
-        }
+//        if (!$this->app['config']['permission.remote']) {
+        $this->registerRoute();
+//        }
     }
 
     public function registerRoute()

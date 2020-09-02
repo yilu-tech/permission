@@ -7,21 +7,21 @@ namespace YiluTech\Permission\Commands;
 use Illuminate\Console\Command;
 use YiluTech\Permission\PermissionManager;
 
-class PermissionMigrateCommand extends Command
+class PermissionSyncCommand extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'permission:migrate {--path=}';
+    protected $signature = 'permission:sync';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'migrate permission.';
+    protected $description = 'sync permissions.';
 
     /**
      * Execute the console command.
@@ -31,10 +31,6 @@ class PermissionMigrateCommand extends Command
     public function handle()
     {
         $manager = new PermissionManager();
-        if ($count = $manager->sync()) {
-            $this->info("Save $count changes.");
-        } else {
-            $this->info('Nothing to save.');
-        }
+        dump($manager->sync());
     }
 }

@@ -105,16 +105,17 @@ class PermissionController
     public function sync()
     {
         \Request::validate([
-            'action' => 'required|in:update,getLastUpdateTime',
-            'changes' => 'required_if:action,update|array|min:1'
+            'action' => 'required|in:sync,getChanges',
+            'data' => 'array|min:1'
         ]);
         $manager = new PermissionManager(\Request::input('server'));
+        $data = \Request::input('data');
+
         switch (\Request::input('action')) {
-            case 'getLastUpdateTime':
-                return $manager->localStore()->getLastUpdateTime();
-            case 'update':
-                $manager->localStore()->saveChanges(\Request::input('changes'));
-                return 'SUCCESS';
+            case 'sync':
+                return $manager->localStore()->sync($data);
+            case 'getChanges':
+                return $manager->localStore()->getChanges($data);
             default:
                 return 'FAIL';
         }

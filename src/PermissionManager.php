@@ -10,22 +10,18 @@ class PermissionManager
 {
     protected $server;
 
-    protected $logger;
-
     protected $config;
 
     protected $stores;
 
     protected $scopes;
 
+    protected $translations;
+
     public function __construct($server = null)
     {
         $this->config = config('permission');
-
-        $this->server = $server ?: $this->config('server');
-
-        $this->logger = new LoggerRepository($this->config('migration_path'));
-
+        $this->server = $server ?? $this->config('server');
         $this->initStores();
     }
 
@@ -44,38 +40,36 @@ class PermissionManager
         return $this->store($this->stores['local']);
     }
 
-    public function sync($time = null)
+    public function getChanges()
     {
-        $counter = 0;
+        $all = $this->all();
+        $changes = [];
         foreach ($this->stores as $store) {
-            $counter += $this->store($store)->sync($time);
+            $items = array_filter($all, function ($item) use ($store) {
+                return Helper::scope_exists($item['scopes'], $store['scopes']);
+            });
+            $changes[] = [
+                'server' => $store['url'] ?? 'local',
+                'changes' => $this->store($store)->getChanges($items)
+            ];
+        }
+        return $changes;
+    }
+
+    public function sync()
+    {
+        $all = $this->all();
+        $counter = [];
+        foreach ($this->stores as $store) {
+            $items = array_filter($all, function ($item) use ($store) {
+                return Helper::scope_exists($item['scopes'], $store['scopes']);
+            });
+            $counter[] = [
+                'server' => $store['url'] ?? 'local',
+                'total' => $this->store($store)->sync($items)
+            ];
         }
         return $counter;
-    }
-
-    public function rollback($time = null)
-    {
-        $counter = 0;
-        foreach ($this->stores as $store) {
-            $counter += $this->store($store)->rollback($time);
-        }
-        return $counter;
-    }
-
-    public function record()
-    {
-        $recorder = $this->logger->read(INF);
-
-        $changes = $recorder->diff($this->all());
-
-        $this->logger->write($changes);
-        return count($changes);
-    }
-
-    public function setFilePath($path)
-    {
-        $this->logger->setPath($path);
-        return $this;
     }
 
     public function serverScopeName()
@@ -130,11 +124,10 @@ class PermissionManager
 
     protected function store($config)
     {
-        $scopes = [$this->serverScopeName(), $config['scopes']];
         if (empty($config['url'])) {
-            return new LocalRepository($this->logger, $scopes);
+            return new LocalRepository($this->serverScopeName());
         }
-        return new RemoteRepository($this->logger, $scopes, $config['url'], $this->server);
+        return new RemoteRepository($this->server, $config['url']);
     }
 
     protected function format(array $items)
@@ -152,12 +145,43 @@ class PermissionManager
                 continue;
             }
             if (isset($data[$item['name']])) {
-                $data[$item['name']] = $this->mergeRouteConfig($data[$item['name']], $item);
+                $data[$item['name']] = $this->mergeConfig($data[$item['name']], $item);
             } else {
+                $item['translations'] = $this->getTranslations($item['name']);
                 $data[$item['name']] = $item;
             }
         }
         return $data;
+    }
+
+    protected function getTranslations($name)
+    {
+        $lang = $this->config('lang', []);
+        $translations = [];
+        foreach ($lang as $local) {
+            $this->loadTranslations($local);
+            if ($translation = $this->translations[$local][$name] ?? null) {
+                if (is_string($translation)) {
+                    $translations[$local] = ['content' => $translation];
+                } else {
+                    $translations[$local] = $translation;
+                }
+            }
+        }
+        return empty($translations) ? null : $translations;
+    }
+
+    protected function loadTranslations($local)
+    {
+        if (isset($this->translations[$local])) {
+            return;
+        }
+        $filename = resource_path("lang/$local/permission.php");
+        if (file_exists($filename)) {
+            $this->translations[$local] = require $filename;
+        } else {
+            $this->translations[$local] = [];
+        }
     }
 
     protected function routeFormatter($item)
@@ -168,10 +192,6 @@ class PermissionManager
             'scopes' => [],
             'content' => ['url' => $item['path'], 'method' => $item['method']]
         ];
-
-        if ($scope = $this->serverScopeName()) {
-            $data['scopes'][] = $scope;
-        }
 
         if (!empty($item['rbac_ignore'])) {
             $data['content']['rbac_ignore'] = $item['rbac_ignore'];
@@ -188,21 +208,22 @@ class PermissionManager
         return $data;
     }
 
-    protected function mergeRouteConfig($config, $item)
+    protected function mergeConfig($config, $other)
     {
-        if (isset($config['scopes'])) {
-            if ($config['scopes'] === $item['scopes']) {
-                return $this->mergeConfigContent($config, $item);
-            }
-            return [$config, $item];
+        if ($config['scopes'] != $other['scopes']) {
+            $config['scopes'] = array_unique(array_merge($config['scopes'], $other['scopes']));
+            sort($config['scopes']);
         }
-        foreach ($config as $index => $value) {
-            if ($value['scopes'] === $item['scopes']) {
-                $config[$index] = $this->mergeConfigContent($value, $item);
+        if (empty($config['content'][0])) {
+            $config['content'] = [$config['content']];
+        }
+        foreach ($config['content'] as $index => $value) {
+            if ($value['url'] < $other['content']['url']) {
+                array_splice($config['content'], $index, 0, [$other['content']]);
                 return $config;
             }
         }
-        $config[] = $item;
+        $config['content'][] = $other['content'];
         return $config;
     }
 

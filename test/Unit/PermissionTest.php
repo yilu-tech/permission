@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use Tests\TestCase;
+use YiluTech\Permission\PermissionManager;
 
 class PermissionTest extends TestCase
 {
@@ -14,6 +15,22 @@ class PermissionTest extends TestCase
     public function testBasicTest()
     {
         $this->assertTrue(true);
+    }
+
+    public function testSync()
+    {
+        $data = [
+            'server' => 'test',
+            'action' => 'sync',
+            'data' => resolve(PermissionManager::class)->all()
+        ];
+        $result = $this->postJson('/permission/sync', $data)->json();
+        dd($result);
+    }
+
+    public function testGetChanges()
+    {
+        dd(resolve(PermissionManager::class)->getChanges());
     }
 
     public function testCreate()

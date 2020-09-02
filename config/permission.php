@@ -7,8 +7,6 @@ return [
 
     // 'local' => '*',
 
-    // 'local' => '*',
-
     // 'server' => '',
 
     'user' => [
@@ -45,4 +43,6 @@ return [
         'prefix' => 'permission',
         'expire' => 15 // day
     ],
+
+    'lang' => ['en', 'zh-CN']
 ];

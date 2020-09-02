@@ -1,45 +1,89 @@
 <?php
 
-
 namespace YiluTech\Permission;
 
 
+use Illuminate\Support\Arr;
 use YiluTech\Permission\Models\Permission;
 
-class LocalRepository extends StoreAbstract
+class LocalRepository
 {
-    public function getLastUpdateTime()
+    /**
+     * @var string
+     */
+    protected $serverScope;
+
+    public function __construct($serverScope)
     {
-        return Permission::query($this->serverScopeName())->max('updated_at');
+        $this->serverScope = $serverScope;
     }
 
-    public function saveChanges($changes)
+    public function sync($items)
     {
-        if (empty($changes)) {
-            return 0;
+        try {
+            \DB::beginTransaction();
+            $counter = ['create' => 0, 'update' => 0, 'delete' => 0];
+            $this->each($items, function ($model, $item) use (&$counter) {
+                if (!$model) {
+                    Permission::create($item);
+                    $counter['create']++;
+                } else if (!$item) {
+                    $model->delete();
+                    $counter['delete']++;
+                } else if ($model->fill($item)->getDirty()) {
+                    $model->save();
+                    $counter['update']++;
+                }
+            });
+            \DB::commit();
+            return $counter;
+        } catch (\Exception $exception) {
+            \DB::rollBack();
+            throw $exception;
         }
-        return \DB::transaction(function () use ($changes) {
-            foreach ($changes as $name => $change) {
-                if (!empty($change['data'])) {
-                    $change['data'] = array_map(function ($data) {
-                        return is_array($data) ? json_encode($data) : $data;
-                    }, $change['data']);
-                    $change['data']['updated_at'] = $change['date'];
+    }
+
+    public function getChanges($items)
+    {
+        $this->each($items, function ($model, $item) use (&$changes) {
+            if ($model) {
+                if ($item) {
+                    if ($dirty = $model->fill($item)->getDirty()) {
+                        $changes[] = ['action' => 'update', 'name' => $model->name, 'data' => $dirty, 'origin' => Arr::only($model->getOriginal(), array_keys($dirty))];
+                    }
+                } else {
+                    $changes[] = ['action' => 'delete', 'name' => $model->name];
                 }
-                switch ($change['action']) {
-                    case 'CREATE':
-                        $change['data']['created_at'] = $change['date'];
-                        \DB::table('permissions')->insert($change['data']);
-                        break;
-                    case 'UPDATE':
-                        \DB::table('permissions')->where('name', $name)->update($change['data']);
-                        break;
-                    default:
-                        \DB::table('permissions')->where('name', $name)->delete();
-                        break;
-                }
+            } else {
+                $changes[] = ['action' => 'create', 'data' => $item];
             }
-            return count($changes);
         });
+        return $changes ?? [];
+    }
+
+    protected function each($items, $callback)
+    {
+        Permission::query($this->serverScope, false)->each(function ($item) use (&$items, $callback) {
+            if (isset($items[$item->name])) {
+                $current = $items[$item->name];
+                $this->bindServerScope($current);
+
+                $callback($item, $current);
+                unset($items[$item->name]);
+            } else {
+                $callback($item, null);
+            }
+        });
+        foreach ($items as $key => $item) {
+            $this->bindServerScope($item);
+            $callback(null, $item);
+        }
+    }
+
+    protected function bindServerScope(&$permission)
+    {
+        if ($this->serverScope) {
+            array_unshift($permission['scopes'], $this->serverScope);
+        }
     }
 }

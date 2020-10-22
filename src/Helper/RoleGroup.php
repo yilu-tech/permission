@@ -79,7 +79,7 @@ class RoleGroup
             $value = $value['value'];
         }
 
-        if (!$value && !$group && !$required) return null;
+        if (!($value && $group) && !$required) return null;
 
         $isHeader = $value && $value{0} === '^';
 

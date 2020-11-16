@@ -4,7 +4,7 @@ namespace YiluTech\Permission\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use YiluTech\Permission\CacheManager;
+use YiluTech\Permission\RedisStore;
 use YiluTech\Permission\Helper\RoleGroup;
 use YiluTech\Permission\Traits\HasChildRoles;
 use YiluTech\Permission\Traits\HasPermissions;
@@ -25,16 +25,26 @@ class Role extends Model
     {
         parent::boot();
         static::deleted(function ($role) {
-            resolve(CacheManager::class)->empty($role);
+            resolve(RedisStore::class)->empty($role);
         });
     }
 
+    /**
+     * @param $id
+     * @param mixed $group
+     * @return \Illuminate\Database\Eloquent\Collection|static|null
+     */
     public static function findById($id, $group = false)
     {
         $query = static::group($group);
         return is_array($id) || $id instanceof Collection ? $query->findMany($id) : $query->find($id);
     }
 
+    /**
+     * @param $name
+     * @param mixed $group
+     * @return \Illuminate\Database\Eloquent\Collection|static|null
+     */
     public static function findByName($name, $group = false)
     {
         $query = static::group($group);

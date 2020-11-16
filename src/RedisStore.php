@@ -3,11 +3,15 @@
 
 namespace YiluTech\Permission;
 
-class CacheManager
+use Illuminate\Support\Facades\Redis;
+
+class RedisStore
 {
     protected $config;
 
     protected $prefix;
+
+    protected $expires;
 
     protected $driver;
 
@@ -19,17 +23,17 @@ class CacheManager
 
     public function user($user)
     {
-        return new UserPermissionCache($user, $this);
+        return new UserCache($user, $this);
     }
 
-    public function expire()
+    public function setExpires($expires)
     {
-        return ($this->config['expire'] ?? 0) * 86400;
+        $this->expires = $expires * 86400;
     }
 
-    public function getPrefix()
+    public function getExpires()
     {
-        return $this->prefix;
+        return $this->expires;
     }
 
     public function setPrefix($name)
@@ -37,15 +41,20 @@ class CacheManager
         $this->prefix = trim($name, ':') . ':';
     }
 
-    public function applyPrefix($key)
+    public function getPrefix()
     {
-        return $this->prefix . $key;
+        return $this->prefix;
+    }
+
+    public function applyPrefix($id, $key)
+    {
+        return '{' . $this->prefix . $id . '}:' . $key;
     }
 
     public function driver()
     {
         if (!$this->driver) {
-            $this->driver = \Redis::connection();
+            $this->driver = Redis::connection($this->config['connection'] ?? 'default');
         }
         return $this->driver;
     }
@@ -53,11 +62,16 @@ class CacheManager
     public function empty($role = null)
     {
         $query = \DB::table('user_has_roles')->groupBy('user_id')->select('user_id', \DB::raw('count(1) as count'));
+
         if ($role) {
             $query->where('role_id', $role->id);
         }
+
         $query->orderBy('user_id')->each(function ($item) {
-            $this->driver()->eval(RedisLuaScript::DEL, 1, $this->applyPrefix($item->user_id . ':keys'));
+            $keys = $this->driver()->smembers($this->applyPrefix($item->user_id, 'keys'));
+            if (!empty($keys)) {
+                $this->driver()->del($keys);
+            }
         });
     }
 }

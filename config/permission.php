@@ -40,8 +40,9 @@ return [
     'migration_path' => 'database/permission',
 
     'cache' => [
+        // 'connection' => 'default',
         'prefix' => 'permission',
-        'expire' => 15 // day
+        'expire' => 3 // day
     ],
 
     'lang' => ['en', 'zh-CN']

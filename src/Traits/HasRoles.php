@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Auth;
 use YiluTech\Permission\Helper\Helper;
 use YiluTech\Permission\Helper\RoleGroup;
 use YiluTech\Permission\PermissionException;
-use YiluTech\Permission\UserPermissionCache;
+use YiluTech\Permission\UserCache;
 use YiluTech\Permission\Models\Role;
 
 trait HasRoles
@@ -60,11 +60,11 @@ trait HasRoles
     }
 
     /**
-     * @return UserPermissionCache
+     * @return UserCache
      */
     public function permissionCache()
     {
-        return new UserPermissionCache($this);
+        return new UserCache($this);
     }
 
     public function checkAuthorizer()

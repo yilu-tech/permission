@@ -81,7 +81,7 @@ class RoleGroup
 
         if (!($value && $group) && !$required) return null;
 
-        $isHeader = $value && $value{0} === '^';
+        $isHeader = $value && $value[0] === '^';
 
         if ($isHeader) {
             $value = substr($value, 1);

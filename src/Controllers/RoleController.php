@@ -118,6 +118,10 @@ class RoleController
             throw new PermissionException('Can not remove system role.');
         }
 
+        if (\DB::table('user_has_roles')->where('role_id', $role->id)->exists()) {
+            throw new PermissionException('Can not remove role, role used.');
+        }
+
         return \DB::transaction(function () use ($role) {
             $role->permissionRelation()->detach();
             $role->childRoleRelation()->detach();

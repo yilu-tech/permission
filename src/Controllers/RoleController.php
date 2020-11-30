@@ -9,10 +9,10 @@
 namespace YiluTech\Permission\Controllers;
 
 use Illuminate\Validation\Rule;
-use YiluTech\Permission\CacheManager;
 use YiluTech\Permission\Helper\RoleGroup;
 use YiluTech\Permission\Models\Role;
 use YiluTech\Permission\PermissionException;
+use YiluTech\Permission\RedisStore;
 
 class RoleController
 {
@@ -101,7 +101,7 @@ class RoleController
             $role->update($data);
 
             if ($changes) {
-                resolve(CacheManager::class)->empty($role);
+                resolve(RedisStore::class)->empty($role);
             }
             return $role;
         });
@@ -129,7 +129,7 @@ class RoleController
             \DB::table('user_has_roles')->where('role_id', $role->id)->delete();
             $role->delete();
 
-            resolve(CacheManager::class)->empty($role);
+            resolve(RedisStore::class)->empty($role);
             return ['data' => 'success'];
         });
     }

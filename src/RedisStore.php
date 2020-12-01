@@ -28,7 +28,7 @@ class RedisStore
 
     public function setExpires($expires)
     {
-        $this->expires = $expires * 86400;
+        $this->expires = max($expires, 120);
     }
 
     public function getExpires()

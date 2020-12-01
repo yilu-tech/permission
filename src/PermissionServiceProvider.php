@@ -41,9 +41,10 @@ class PermissionServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 \YiluTech\Permission\Commands\MakeRoleCommand::class,
-                \YiluTech\Permission\Commands\PermissionSyncCommand::class,
-                \YiluTech\Permission\Commands\PermissionDiffCommand::class,
-                \YiluTech\Permission\Commands\MakePermissionTranslationCommand::class,
+                \YiluTech\Permission\Commands\MigratePermissionCommand::class,
+                \YiluTech\Permission\Commands\RollbackPermissionCommand::class,
+                \YiluTech\Permission\Commands\MakePermissionMigrationCommand::class,
+                \YiluTech\Permission\Commands\GeneratePermissionMigrationCommand::class,
             ]);
             $this->offerPublishing();
         }
@@ -63,11 +64,6 @@ class PermissionServiceProvider extends ServiceProvider
 
         Route::group($options, function ($router) {
             Route::get('permission/list', 'PermissionController@list')->name('permission.list');
-            Route::post('permission/create', 'PermissionController@create')->name('permission.create');
-            Route::post('permission/update', 'PermissionController@update')->name('permission.update');
-            Route::post('permission/delete', 'PermissionController@delete')->name('permission.delete');
-            Route::post('permission/translate', 'PermissionController@translate')->name('permission.translate');
-            Route::post('permission/removetranslate', 'PermissionController@removetranslate')->name('permission.removetranslate');
             Route::get('role/list', 'RoleController@list')->name('role.list');
             Route::post('role/create', 'RoleController@create')->name('role.create');
             Route::post('role/update', 'RoleController@update')->name('role.update');
@@ -77,7 +73,7 @@ class PermissionServiceProvider extends ServiceProvider
         $options = array_merge($defaultOptions, $this->app['config']['permission']['internal_route_option'] ?? []);
 
         Route::group($options, function ($router) {
-            Route::post('permission/sync', 'PermissionController@sync')->name('permission.sync');
+            Route::post('permission/call', 'PermissionController@call')->name('permission.call');
         });
     }
 

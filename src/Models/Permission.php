@@ -9,7 +9,7 @@ class Permission extends Model
 {
     protected $table = 'permissions';
 
-    protected $fillable = ['id', 'name', 'type', 'scopes', 'content', 'translations'];
+    protected $fillable = ['name', 'type', 'scopes', 'content', 'translations', 'version', 'created_at', 'updated_at'];
 
     public $timestamps = false;
 
@@ -20,22 +20,11 @@ class Permission extends Model
         'translations' => 'json'
     ];
 
-    protected static function boot()
-    {
-        parent::boot();
-
-        static::created(function ($model) {
-            PermissionLog::insert($model->name, 'create');
-        });
-
-        static::updated(function ($model) {
-            PermissionLog::insert($model->name, 'update', $model->getDirty());
-        });
-
-        static::deleted(function ($model) {
-            PermissionLog::insert($model->name, 'delete');
-        });
-    }
+    protected $hidden = [
+        'version',
+        'created_at',
+        'updated_at'
+    ];
 
     public static function query($scope = false, $lang = null, $query = null)
     {

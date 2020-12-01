@@ -20,6 +20,7 @@ class CreatePermissionsTable extends Migration
             $table->string('scopes');
             $table->string('content', 2048)->nullable();
             $table->string('translations', 2048)->nullable();
+            $table->unsignedInteger('version')->default(1);
             $table->timestamps();
         });
     }

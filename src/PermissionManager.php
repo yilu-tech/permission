@@ -3,255 +3,228 @@
 
 namespace YiluTech\Permission;
 
-use Illuminate\Support\Arr;
-use YiluTech\Permission\Helper\Helper;
+use YiluTech\Permission\Models\Permission;
 
 class PermissionManager
 {
-    protected $server;
+    private $service;
 
-    protected $config;
+    /**
+     * @var Permission[]
+     */
+    private $items;
 
-    protected $stores;
+    private $changes = [];
 
-    protected $scopes;
-
-    protected $translations;
-
-    public function __construct($server = null)
+    public function __construct(string $service)
     {
-        $this->config = config('permission');
-        $this->server = $server ?? $this->config('server');
-        $this->initStores();
+        $this->service = $service;
+        $this->boot();
     }
 
-    public function config($name = null, $default = null)
+    protected function query()
     {
-        return Arr::get($this->config, $name, $default);
+        return Permission::query('__' . $this->service, false);
     }
 
-    public function all()
+    protected function log()
     {
-        return $this->format(RoutePermission::all());
+        return \DB::table('permission_logs');
     }
 
-    public function localStore()
+    protected function boot()
     {
-        return $this->store($this->stores['local']);
+        $this->items = [];
+        $this->query()->each(function ($item) {
+            $this->items[$item->name] = $item;
+        });
     }
 
-    public function getChanges()
+    public function lastVersion()
     {
-        $all = $this->all();
-        $changes = [];
-        foreach ($this->stores as $store) {
-            $items = array_filter($all, function ($item) use ($store) {
-                return Helper::scope_exists($item['scopes'], $store['scopes']);
-            });
-            $changes[] = [
-                'server' => $store['url'] ?? 'local',
-                'changes' => $this->store($store)->getChanges($items)
-            ];
-        }
-        return $changes;
+        return array_reduce($this->items, function ($max, $item) {
+            return max($max, $item->version);
+        }, 0);
     }
 
-    public function sync()
+    public function items()
     {
-        $all = $this->all();
-        $counter = [];
-        foreach ($this->stores as $store) {
-            $items = array_filter($all, function ($item) use ($store) {
-                return Helper::scope_exists($item['scopes'], $store['scopes']);
-            });
-            $counter[] = [
-                'server' => $store['url'] ?? 'local',
-                'total' => $this->store($store)->sync($items)
-            ];
-        }
-        return $counter;
+        return $this->items;
     }
 
-    public function serverScopeName()
+    public function getChange($name)
     {
-        if ($this->server) {
-            return '__' . $this->server;
-        }
-        return null;
+        return $this->changes[$name] ?? [null, null];
     }
 
-    protected function initStores()
+    public function create($name, $data, $date)
     {
-        $this->stores = [];
-        if (!empty($remote = $this->config('remote'))) {
-            if (is_array($remote)) {
-                foreach ($remote as $key => $value) {
-                    $scopes = ($key === '*' || is_integer($key)) ? '*' : explode('|', $key);
-                    $this->stores[] = ['scopes' => $scopes, 'url' => $value];
-                }
-            } else {
-                $this->stores[] = ['scopes' => '*', 'url' => $remote];
-            }
+        if (isset($this->items[$name])) {
+            throw new PermissionException(sprintf('permission name "%s" exists', $name));
         }
-        if ($local = $this->config('local')) {
-            $this->stores['local'] = ['scopes' => $local == '*' ? $local : explode('|', $local)];
-        } elseif (!$remote) {
-            $this->stores['local'] = ['scopes' => '*'];
-        }
+        array_unshift($data['scopes'], '__' . $this->service);
+        $data['updated_at'] = $date;
 
-        $this->scopes = [];
-        foreach ($this->stores as $store) {
-            if ($store['scopes'] === '*') {
-                $this->scopes = '*';
-                break;
-            } else {
-                $this->scopes = array_merge($this->scopes, $store['scopes']);
-            }
-        }
-
-        if ($this->scopes !== '*') {
-            $this->scopes = array_unique($this->scopes);
-        }
-    }
-
-    protected function filter($item)
-    {
-        if (!empty($item['content']['rbac_ignore'])) {
-            return false;
-        }
-        return Helper::scope_exists($item['scopes'], $this->scopes);
-    }
-
-    protected function store($config)
-    {
-        if (empty($config['url'])) {
-            return new LocalRepository($this->serverScopeName());
-        }
-        return new RemoteRepository($this->server, $config['url']);
-    }
-
-    protected function format(array $items)
-    {
-        $data = [];
-        foreach ($items as $item) {
-            switch ($item['type']) {
-                case 'api':
-                    $item = $this->routeFormatter($item, $data[$item['name']] ?? null);
-                    break;
-                default:
-                    break;
-            }
-            if (!$this->filter($item)) {
-                continue;
-            }
-            if (isset($data[$item['name']])) {
-                $data[$item['name']] = $this->mergeConfig($data[$item['name']], $item);
-            } else {
-                $item['translations'] = $this->getTranslations($item['name']);
-                $data[$item['name']] = $item;
-            }
-        }
-        return $data;
-    }
-
-    protected function getTranslations($name)
-    {
-        $lang = $this->config('lang', []);
-        $translations = [];
-        foreach ($lang as $local) {
-            $this->loadTranslations($local);
-            if ($translation = $this->translations[$local][$name] ?? null) {
-                if (is_string($translation)) {
-                    $translations[$local] = ['content' => $translation];
-                } else {
-                    $translations[$local] = $translation;
-                }
-            }
-        }
-        return empty($translations) ? null : $translations;
-    }
-
-    protected function loadTranslations($local)
-    {
-        if (isset($this->translations[$local])) {
-            return;
-        }
-        $filename = resource_path("lang/$local/permission.php");
-        if (file_exists($filename)) {
-            $this->translations[$local] = require $filename;
+        [$action, $item] = $this->getChange($name);
+        if ($action === 'delete') {
+            $this->changes[$name] = ['update', $item->fill($data)];
         } else {
-            $this->translations[$local] = [];
+            $data['created_at'] = $date;
+            $item = new Permission($data);
+            $this->changes[$name] = ['create', $item];
         }
+
+        $this->items[$name] = $item;
     }
 
-    protected function routeFormatter($item)
+    public function update($name, $changes, $date)
     {
-        $data = [
-            'name' => $item['name'],
-            'type' => $item['type'],
-            'scopes' => [],
-            'content' => ['url' => $item['path'], 'method' => $item['method']]
-        ];
-
-        if (!empty($item['rbac_ignore'])) {
-            $data['content']['rbac_ignore'] = $item['rbac_ignore'];
+        if (empty($this->items[$name])) {
+            throw new PermissionException(sprintf('permission name "%s" not found, can not update', $name));
         }
+        $item = $this->items[$name];
+        $item->fill($this->applyChange($item->toArray(), $changes));
 
-        if ($item['auth'] === '*') {
-            $data['scopes'][] = '*';
+        [$action, $curr] = $this->getChange($name);
+        if ($curr) {
+            if ($item->name !== $name) {
+                $this->changes[$item->name] = [$action, $item];
+                unset($this->changes[$name]);
+            }
         } else {
-            foreach ($item['auth'] as $auth) {
-                $data['scopes'] = array_merge($data['scopes'], $this->parseRouteScope($auth));
-            }
-            usort($data['scopes'], [Helper::class, 'scope_cmp']);
-        }
-        return $data;
-    }
-
-    protected function mergeConfig($config, $other)
-    {
-        if ($config['scopes'] != $other['scopes']) {
-            $config['scopes'] = array_unique(array_merge($config['scopes'], $other['scopes']));
-            sort($config['scopes']);
-        }
-        if (empty($config['content'][0])) {
-            $config['content'] = [$config['content']];
-        }
-        foreach ($config['content'] as $index => $value) {
-            if ($value['url'] < $other['content']['url']) {
-                array_splice($config['content'], $index, 0, [$other['content']]);
-                return $config;
+            if ($item->isDirty()) {
+                $item->updated_at = $date;
+                $this->changes[$item->name] = ['update', $item];
             }
         }
-        $config['content'][] = $other['content'];
-        return $config;
+
+        if ($item->name !== $name) {
+            $this->items[$item->name] = $item;
+            unset($this->items[$name]);
+        }
     }
 
-    protected function mergeConfigContent($config, $item)
+    public function delete($name)
     {
-        if (empty($config['content'][0])) {
-            $config['content'] = [$config['content']];
+        if (empty($this->items[$name])) {
+            throw new PermissionException(sprintf('permission name "%s" not found, can not delete', $name));
         }
-        foreach ($config['content'] as $index => $value) {
-            if ($value['url'] > $item['content']['url']) {
-                array_splice($config['content'], $index, 0, [$item['content']]);
-                return $config;
+
+        [$action, $item] = $this->getChange($name);
+        if ($action === 'create') {
+            unset($this->changes[$name]);
+        } else {
+            $this->changes[$name] = ['delete', $this->items[$name]];
+        }
+        unset($this->items[$name]);
+    }
+
+    public function save($version)
+    {
+        foreach ($this->changes as [$action, $item]) {
+            if ($action !== 'create') {
+                $this->log()->insert([
+                    'name' => $item->name,
+                    'content' => json_encode($item->getOriginal()),
+                    'version' => $version,
+                    'updated_at' => $item->getOriginal('updated_at')
+                ]);
+            }
+            if ($action === 'delete') {
+                $del[] = $item->getKey();
+            } else {
+                $item->version = $version + 1;
+                $item->save();
             }
         }
-        $config['content'][] = $item['content'];
-        return $config;
+        if (isset($del)) {
+            $this->query()->whereKey($del)->delete();
+        }
+        $this->changes = [];
     }
 
-    protected function parseRouteScope($scope)
+    public function rollback()
     {
-        $parts = explode('.', $scope, 2);
-        if (empty($parts[1])) {
-            return [$parts[0]];
+        $version = $this->lastVersion();
+
+        $current = array_filter($this->items, function ($item) use ($version) {
+            return $item->version == $version;
+        });
+
+        $originals = $this->log()->where('version', $version - 1)->get();
+        foreach ($originals as $original) {
+            $content = json_decode($original->content, JSON_OBJECT_AS_ARRAY);
+            if (isset($current[$original->name])) {
+                $item = $current[$original->name];
+                if ($content['name'] !== $original->name) {
+                    unset($this->items[$original->name]);
+                }
+                unset($current[$original->name]);
+            } else {
+                $item = new Permission();
+            }
+            $item->setRawAttributes($content)->save();
+            $this->items[$item->name] = $item;
         }
-        $scopes = [];
-        foreach (explode(',', $parts[1]) as $item) {
-            $scopes[] = $item && $item !== 'default' ? "{$parts[0]}.$item" : $parts[0];
+
+        foreach ($current as $name => $item) {
+            $del[] = $item->getKey();
+            unset($this->items[$name]);
         }
-        return $scopes;
+
+        if (isset($del)) {
+            $this->query()->whereKey($del)->delete();
+        }
+
+        if (!empty($original)) {
+            $this->log()->where('version', $version - 1)->delete();
+        }
+
+        return $this;
+    }
+
+    protected function applyChange(array $origin, $changes)
+    {
+        foreach ($changes as $key => $items) {
+            if (!isset($origin[$key])) {
+                $origin[$key] = null;
+            }
+            foreach ($items as $change) {
+                switch ($change['action']) {
+                    case '|<':
+                    case '>|':
+                        if (isset($change['attr'])) {
+                            $value = data_get($origin[$key], $change['attr']);
+                            Utils::data_merge($value, $change['value']);
+                            data_set($origin[$key], $change['attr'], $value);
+                        } else {
+                            Utils::data_merge($origin[$key], $change['value']);
+                        }
+                        break;
+                    case '|>':
+                    case '<|':
+                        if (isset($change['attr'])) {
+                            if (is_null($change['value'])) {
+                                Utils::data_del($origin[$key], $change['attr']);
+                            } else {
+                                $value = data_get($origin[$key], $change['attr']);
+                                Utils::data_split($value, $change['value']);
+                                data_set($origin[$key], $change['attr'], $value);
+                            }
+                        } else {
+                            Utils::data_split($origin[$key], $change['value']);
+                        }
+                        break;
+                    default:
+                        if (isset($change['attr'])) {
+                            data_set($origin[$key], $change['attr'], $change['value']);
+                        } else {
+                            $origin[$key] = $change['value'];
+                        }
+                        break;
+                }
+            }
+        }
+        return $origin;
     }
 }

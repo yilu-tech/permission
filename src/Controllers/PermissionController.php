@@ -8,10 +8,12 @@
 
 namespace YiluTech\Permission\Controllers;
 
+use YiluTech\Permission\LocalStore;
+use YiluTech\Permission\Migration;
+use YiluTech\Permission\MigrationBatch;
 use YiluTech\Permission\Models\Permission;
 use YiluTech\Permission\Models\Role;
 use YiluTech\Permission\PermissionException;
-use YiluTech\Permission\PermissionManager;
 
 class PermissionController
 {
@@ -30,94 +32,51 @@ class PermissionController
         return Permission::query(\Request::input('scope', false))->get();
     }
 
-    public function create()
+    public function call()
     {
         \Request::validate([
-            'name' => ['required', 'string', 'max:40', 'regex:/^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*$/', 'unique:permissions,name'],
-            'type' => 'required|string|max:16',
-            'scopes' => 'array',
-            'content' => 'nullable|array'
+            'action' => 'required|in:getItems,getMigrated,migrate,rollback',
+            'service' => 'required|string'
         ]);
-        $data = \Request::input();
-        if (empty($data['scopes'])) {
-            $data['scopes'] = [];
+        try {
+            return [
+                'code' => 'success',
+                'data' => call_user_func([$this, \Request::input('action')])
+            ];
+        } catch (\Exception $exception) {
+            return [
+                'code' => 'fail',
+                'message' => $exception->getMessage()
+            ];
         }
-        return Permission::query()->create($data);
     }
 
-    public function update()
+    protected function getItems()
     {
-        $permission = Permission::findById(\Request::input('permission_id'));
-        if (!$permission) throw new PermissionException('permission not exists.');
-        $data = \Request::input();
-        \Request::validate([
-            'name' => ['required', 'string', 'max:40', 'regex:/^[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*$/', 'unique:permissions,name,' . $data['permission_id']],
-            'type' => 'string|max:16',
-            'scopes' => 'array',
-            'content' => 'nullable|array'
-        ]);
-        $permission->update($data);
-        return $permission;
+        return app(LocalStore::class, ['service' => \Request::input('service')])->items();
     }
 
-    public function delete()
-    {
-        if (\Request::has('permission_id')) {
-            Permission::query()->where('id', \Request::input('permission_id'))->delete();
-        } else {
-            Permission::query()->where('name', \Request::input('name'))->delete();
-        }
-        return ['data' => 'success'];
-    }
-
-    public function translate()
+    protected function getMigrated()
     {
         \Request::validate([
-            'name' => ['required', 'string', 'max:40', 'regex:/^([a-zA-Z0-9]+|[*])(\.[a-zA-Z0-9]+)*$/'],
-            'lang' => 'required|string|in:zh_CN,en',
-            'content' => 'nullable|string|max:64',
-            'description' => 'nullable|string|max:255'
+            'times' => 'integer',
         ]);
-
-        $permission = Permission::query(false, false)->where('name', \Request::input('name'))->first();
-        if (!$permission) {
-            throw new PermissionException('Permission not exists.');
-        }
-        $lang = \Request::input('lang');
-        $data = [
-            'name' => \Request::input('content'),
-            'desc' => \Request::input('description')
-        ];
-        $translations = $permission->translations;
-        if ($data['name']) {
-            if ($translations) {
-                $translations[$lang] = $data;
-            } else {
-                $translations = [$lang => $data];
-            }
-        } else {
-            unset($translations[$lang]);
-        }
-        $permission->update(compact('translations'));
-        return $permission;
+        $migration = app(Migration::class, ['service' => \Request::input('service')]);
+        return $migration->migrated(\Request::input('times', 1));
     }
 
-    public function sync()
+    protected function migrate()
     {
         \Request::validate([
-            'action' => 'required|in:sync,getChanges',
-            'data' => 'array|min:1'
+            'migrations' => 'array|min:1',
+            'migrations.*' => 'file|mimes:txt',
         ]);
-        $manager = new PermissionManager(\Request::input('server'));
-        $data = \Request::input('data');
+        $batch = app(MigrationBatch::class, ['files' => \Request::file('migrations')]);
+        $batch->migrate(\Request::input('service'));
+    }
 
-        switch (\Request::input('action')) {
-            case 'sync':
-                return $manager->localStore()->sync($data);
-            case 'getChanges':
-                return $manager->localStore()->getChanges($data);
-            default:
-                return 'FAIL';
-        }
+    protected function rollback()
+    {
+        return app(LocalStore::class, ['service' => \Request::input('service')])->rollback();
     }
 }

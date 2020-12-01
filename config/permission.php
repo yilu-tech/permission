@@ -1,12 +1,11 @@
 <?php
 
 return [
-    // 'remote' => [
-    //     '@admin' => 'http://examlple/admin'
+    // 'endpoints' => [
+    //     'http://examlple/admin',
+    //     'backend' => 'http://examlple/admin',
     // ],
-
-    // 'local' => '*',
-
+    // 'local' => null, // default
     // 'server' => '',
 
     'user' => [
@@ -42,8 +41,7 @@ return [
     'cache' => [
         // 'connection' => 'default',
         'prefix' => 'permission',
-        'expire' => 3 // day
-    ],
 
-    'lang' => ['en', 'zh-CN']
+        'expires' => 7200 // default
+    ],
 ];

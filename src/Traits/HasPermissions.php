@@ -3,6 +3,7 @@
 namespace YiluTech\Permission\Traits;
 
 use YiluTech\Permission\Helper\Helper;
+use YiluTech\Permission\Helper\RoleGroup;
 use YiluTech\Permission\Models\Permission;
 use YiluTech\Permission\PermissionException;
 
@@ -125,7 +126,7 @@ trait HasPermissions
 
     protected function getPermissionScope()
     {
-        $info = $this->groupInfo();
+        $info = RoleGroup::parse($this->group);
         if (!$info['scope']) {
             return $info['key'];
         }

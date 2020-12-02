@@ -81,7 +81,14 @@ trait HasRoles
             $roles = $roles->merge(Role::status(RS_BASIC, $group)->get()->all())->unique('id');
         }
 
-        $attach = $roles->diffUsing($this->roles($group), function ($a, $b) {
+        $roles->each(function ($role) {
+            $role->group = $this->makeRoleGroup($role);
+        });
+
+        $attach = $roles->diffUsing($this->roles(), function ($a, $b) {
+            if ($a->id == $b->id) {
+                return $a->group == $b->pivot->group ? 0 : -1;
+            }
             return $a->id - $b->id;
         });
 
@@ -91,7 +98,7 @@ trait HasRoles
 
         $relation = $this->roleRelation();
         foreach ($attach as $item) {
-            $attributes = ['group' => $this->makeRoleGroup($item)];
+            $attributes = ['group' => $item->group];
             $relation->attach($item->id, $attributes);
 
             $item->setRelation('pivot', $relation->newExistingPivot($attributes));
@@ -250,8 +257,12 @@ trait HasRoles
     protected function makeRoleGroup($role)
     {
         $group = RoleGroup::parse($role->group);
-        if (!$group['key']) return '';
-        if ($group['value'] === null) return $group['key'] . ':' . RoleGroup::value($group['key']);
+        if (empty($group['key'])) {
+            return '';
+        }
+        if (empty($group['value'])) {
+            return RoleGroup::make($group['key']);
+        }
         return $role->group;
     }
 }

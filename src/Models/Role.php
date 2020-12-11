@@ -63,30 +63,12 @@ class Role extends Model
         if ($group === false) {
             return static::query();
         }
-        $group = RoleGroup::parse($group);
-        if (!$group['key']) {
-            return static::query()->whereNull('group');
-        }
-        if ($group['value'] === null) {
-            return static::query()->where('group', $group['key']);
-        }
-        return static::query()->where(function ($query) use ($group) {
-            $query->where('group', $group['key'])->orWhere('group', $group['key'] . ':' . $group['value']);
-        });
+        return RoleGroup::bindQuery(static::query(), $group);
     }
 
     public function isAdministrator()
     {
         return $this->status & RS_ADMIN;
-    }
-
-    public function groupInfo($name = null)
-    {
-        $info = RoleGroup::parse($this->getAttributeFromArray('group'));
-        if ($info['scope'] === null) {
-            $info['scope'] = RoleGroup::scope($info['key']);
-        }
-        return $name ? $info[$name] : $info;
     }
 
     public function users()

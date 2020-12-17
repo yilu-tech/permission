@@ -9,11 +9,6 @@ class StoreManager
     protected $config;
 
     /**
-     * @var Migration
-     */
-    protected $migration;
-
-    /**
      * @var LocalStore[]
      */
     protected $stores = [];

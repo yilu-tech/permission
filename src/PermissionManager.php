@@ -16,9 +16,15 @@ class PermissionManager
 
     private $changes = [];
 
+    /**
+     * @var Migration
+     */
+    private $migration;
+
     public function __construct(string $service)
     {
         $this->service = $service;
+        $this->migration = new Migration($service);
         $this->boot();
     }
 
@@ -40,16 +46,24 @@ class PermissionManager
         });
     }
 
-    public function lastVersion()
+    public function migration()
     {
-        return array_reduce($this->items, function ($max, $item) {
-            return max($max, $item->version);
-        }, 0);
+        return $this->migration;
+    }
+
+    public function isEmpty()
+    {
+        return empty($this->items);
     }
 
     public function items()
     {
         return $this->items;
+    }
+
+    public function lastVersion()
+    {
+        return $this->migration->lastBatch();
     }
 
     public function getChange($name)
@@ -75,6 +89,8 @@ class PermissionManager
         }
 
         $this->items[$name] = $item;
+
+        return $this;
     }
 
     public function update($name, $changes, $date)
@@ -102,6 +118,8 @@ class PermissionManager
             $this->items[$item->name] = $item;
             unset($this->items[$name]);
         }
+
+        return $this;
     }
 
     public function delete($name)
@@ -117,10 +135,15 @@ class PermissionManager
             $this->changes[$name] = ['delete', $this->items[$name]];
         }
         unset($this->items[$name]);
+
+        return $this;
     }
 
-    public function save($version)
+    public function save(array $files)
     {
+        $this->migration->migrate($files);
+
+        $version = $this->lastVersion();
         foreach ($this->changes as [$action, $item]) {
             if ($action !== 'create') {
                 $this->log()->insert([
@@ -141,11 +164,15 @@ class PermissionManager
             $this->query()->whereKey($del)->delete();
         }
         $this->changes = [];
+        return $this;
     }
 
     public function rollback()
     {
         $version = $this->lastVersion();
+        if (!$version) {
+            return $this;
+        }
 
         $current = array_filter($this->items, function ($item) use ($version) {
             return $item->version == $version;
@@ -180,12 +207,29 @@ class PermissionManager
             $this->log()->where('version', $version - 1)->delete();
         }
 
+        $this->migration->rollback();
+        return $this;
+    }
+
+    public function mergeTo(string $file)
+    {
+        if (!$this->isEmpty()) {
+            $this->query()->update(['version' => 1]);
+            $this->log()->whereIn('version', $this->migration->batches()->map(function ($v) {
+                return $v - 1;
+            }))->delete();
+            $this->migration->mergeTo($file);
+        }
         return $this;
     }
 
     protected function applyChange(array $origin, $changes)
     {
         foreach ($changes as $key => $items) {
+            if (!is_array($items)) {
+                $origin[$key] = $items;
+                continue;
+            }
             if (!isset($origin[$key])) {
                 $origin[$key] = null;
             }

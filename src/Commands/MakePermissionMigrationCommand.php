@@ -12,7 +12,7 @@ class MakePermissionMigrationCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'make:ps-migration {--name=} {--type=json}';
+    protected $signature = 'make:permission {--name=} {--type=json}';
 
     /**
      * The console command description.
@@ -28,7 +28,7 @@ class MakePermissionMigrationCommand extends Command
      */
     public function handle()
     {
-        if (!in_array($this->option('type'), ['json', 'yaml'])) {
+        if (!in_array($type = $this->option('type'), ['json', 'yaml'])) {
             $this->error(sprintf('invalid type.'));
             return;
         }
@@ -41,11 +41,12 @@ class MakePermissionMigrationCommand extends Command
             $prefix .= '_' . $name;
         }
 
-        $path = $path . DIRECTORY_SEPARATOR . $prefix . '.' . $this->option('type');
+        $path = $path . DIRECTORY_SEPARATOR . $prefix . '.' . $type;
         if (file_exists($path)) {
             $this->error(sprintf('file %s exists.', $path));
             return;
         }
+        file_put_contents($path, $type === 'json' ? "{\n}" : '');
         $this->info($path);
         $this->info('generate file success.');
     }

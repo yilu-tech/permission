@@ -14,7 +14,7 @@ class RollbackPermissionCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'rbac:rollback';
+    protected $signature = 'permission:rollback {--steps=1}';
 
     /**
      * The console command description.
@@ -35,7 +35,7 @@ class RollbackPermissionCommand extends Command
         $count = 0;
         foreach ($manager->stores() as $name => $store) {
             $this->info(sprintf('rollback store[%s]', $name ?: 'default'));
-            $migration = $store->rollback();
+            $migration = $store->rollback(intval($this->option('steps')));
             $count += count($migration);
             $this->info(implode("\n", $migration));
         }

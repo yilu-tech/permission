@@ -5,7 +5,6 @@ namespace YiluTech\Permission;
 
 
 use GuzzleHttp\Client;
-use Illuminate\Support\Arr;
 
 class RemoteStore extends LocalStore
 {
@@ -31,19 +30,19 @@ class RemoteStore extends LocalStore
         }));
     }
 
-    public function rollback()
+    public function rollback($steps = 1)
     {
-        return $this->request('rollback');
+        return $this->request('rollback', compact('steps'));
     }
 
-    public function items()
+    public function mergeTo($file)
     {
-        return $this->request('getItems');
+        return $this->request('mergeTo', compact('file'));
     }
 
     public function getMigrated()
     {
-        return Arr::pluck($this->request('getMigrated', ['times' => -1]), 'migration');
+        return $this->request('getMigrated', ['steps' => -1]);
     }
 
     protected function request($action, $data = [], $options = [])

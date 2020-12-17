@@ -16,7 +16,7 @@ class Migration
     public function __construct(string $service)
     {
         $this->service = $service;
-        $this->batches = $this->query()->get()->groupBy('batch');
+        $this->batches = $this->query()->get()->groupBy('batch')->sortKeysDesc();
     }
 
     protected function query()
@@ -34,12 +34,22 @@ class Migration
         return false;
     }
 
-    public function lastBatch()
+    public function batches()
     {
-        return $this->batches->keys()->last(null, 0);
+        return $this->batches->keys();
     }
 
-    public function migrate($files)
+    public function migrations()
+    {
+        return $this->batches->flatten()->pluck('migration');
+    }
+
+    public function lastBatch(): int
+    {
+        return $this->batches()->get(0, 0);
+    }
+
+    public function migrate(array $files)
     {
         $batch = $this->lastBatch() + 1;
         $container = collect();
@@ -48,33 +58,42 @@ class Migration
             $this->query()->insert($content);
             $container->put(null, (object)$content);
         }
-        $this->batches->put($batch, $container);
+        $this->batches->put($batch, $container)->sortKeysDesc();
+        return $this;
     }
 
     public function rollback()
     {
         if ($batch = $this->lastBatch()) {
             $this->query()->where('batch', $batch)->delete();
-            return tap($this->batches[$batch], function ($container) use ($batch) {
-                $this->batches->offsetUnset($batch);
-            });
+            $this->batches->offsetUnset($batch);
         }
-        return collect();
+        return $this;
     }
 
-    public function migrated($times = 1)
+    public function mergeTo($file)
     {
-        if ($max = $this->lastBatch()) {
-            $min = $times < 1 ? 0 : max($max - $times, 0);
+        $this->query()->delete();
 
-            if ($min === 0) {
-                return $this->batches->flatten();
-            }
+        $this->batches = collect();
+        $this->migrate([$file]);
 
-            return $this->batches->filter(function ($item, $batch) use ($min, $max) {
-                return $batch > $min;
-            })->flatten();
+        return $this;
+    }
+
+    public function migrated($steps = 1)
+    {
+        if ($steps < 1) {
+            return $this->batches->flatten()->pluck('migration');
         }
-        return collect();
+        $index = 0;
+        $migrations = collect();
+        foreach ($this->batches as $batch) {
+            if ($index++ >= $steps) {
+                break;
+            }
+            $migrations = $migrations->merge($batch->pluck('migration'));
+        }
+        return $migrations;
     }
 }

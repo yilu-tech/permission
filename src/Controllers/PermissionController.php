@@ -35,13 +35,13 @@ class PermissionController
     public function call()
     {
         \Request::validate([
-            'action' => 'required|in:getItems,getMigrated,migrate,rollback',
+            'action' => 'required|in:getMigrated,migrate,rollback,mergeTo',
             'service' => 'required|string'
         ]);
         try {
             return [
                 'code' => 'success',
-                'data' => call_user_func([$this, \Request::input('action')])
+                'data' => call_user_func([$this, \Request::input('action')], \Request::input('service'))
             ];
         } catch (\Exception $exception) {
             return [
@@ -51,32 +51,37 @@ class PermissionController
         }
     }
 
-    protected function getItems()
-    {
-        return app(LocalStore::class, ['service' => \Request::input('service')])->items();
-    }
-
-    protected function getMigrated()
+    protected function mergeTo($service)
     {
         \Request::validate([
-            'times' => 'integer',
+            'file' => 'required|string',
         ]);
-        $migration = app(Migration::class, ['service' => \Request::input('service')]);
-        return $migration->migrated(\Request::input('times', 1));
+        return app(LocalStore::class, ['service' => $service])->mergeTo(\Request::input('file'));
     }
 
-    protected function migrate()
+    protected function getMigrated($service)
+    {
+        \Request::validate([
+            'steps' => 'integer',
+        ]);
+        return app(Migration::class, ['service' => $service])->migrated(\Request::input('steps', 1));
+    }
+
+    protected function migrate($service)
     {
         \Request::validate([
             'migrations' => 'array|min:1',
             'migrations.*' => 'file|mimes:txt',
         ]);
         $batch = app(MigrationBatch::class, ['files' => \Request::file('migrations')]);
-        $batch->migrate(\Request::input('service'));
+        $batch->migrate($service);
     }
 
-    protected function rollback()
+    protected function rollback($service)
     {
-        return app(LocalStore::class, ['service' => \Request::input('service')])->rollback();
+        \Request::validate([
+            'steps' => 'integer|min:1',
+        ]);
+        return app(LocalStore::class, ['service' => $service])->rollback(\Request::input('steps', 1));
     }
 }

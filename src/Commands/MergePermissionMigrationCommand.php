@@ -7,21 +7,21 @@ namespace YiluTech\Permission\Commands;
 use Illuminate\Console\Command;
 use YiluTech\Permission\StoreManager;
 
-class GeneratePermissionMigrationCommand extends Command
+class MergePermissionMigrationCommand extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'generate:ps-migration {--type=json}';
+    protected $signature = 'permission:merge {--type=json}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'generate permissions.';
+    protected $description = 'merge permission migrations.';
 
     /**
      * Execute the console command.
@@ -43,29 +43,43 @@ class GeneratePermissionMigrationCommand extends Command
 
         $manager = new StoreManager(config('permission'));
         foreach ($manager->stores() as $name => $store) {
-            $this->generate($path, $store);
+            $this->merge($path, $store);
         }
-        $this->info('generate success.');
+        $this->info('merge finished.');
     }
 
-    public function generate($directory, $store)
+    public function merge($directory, $store)
     {
         $prefix = date('Y_m_d_His');
         if ($name = $store->name()) {
             $prefix .= '_' . $name;
         }
         $type = $this->option('type');
-        $path = $directory . DIRECTORY_SEPARATOR . $prefix . '.' . $type;
+
+        $filename = $prefix . '.' . $type;
+        $path = $directory . DIRECTORY_SEPARATOR . $filename;
+
         if (file_exists($path)) {
             $this->error(sprintf('file %s exists.', $path));
             return;
         }
 
-        if (empty($items = $store->items())) {
-            $this->info(sprintf('store[%s] nothing generate.', $name ?: 'default'));
+        [$files, $items] = $store->mergeTo($filename);
+        if (empty($items)) {
+            $this->info(sprintf('store[%s] nothing to merge.', $name ?: 'default'));
         } else {
             call_user_func([$this, 'write' . ucfirst($type)], $path, $items);
             $this->info(sprintf('store[%s] generate to file %s.', $name ?: 'default', $path));
+
+            foreach ($files as $file) {
+                $path = $directory . DIRECTORY_SEPARATOR . $file;
+                if (file_exists($path)) {
+                    @unlink($path);
+                    $this->warn('remove: ' . $path);
+                } else {
+                    $this->error($path . ' not found.');
+                }
+            }
         }
     }
 

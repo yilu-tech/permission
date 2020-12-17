@@ -46,29 +46,44 @@ class LocalStore
         }));
     }
 
-    public function rollback()
+    public function rollback($steps = 1)
     {
-        $migration = new Migration($this->service);
-        if (!$migration->lastBatch()) {
+        $manager = new PermissionManager($this->service);
+        if (!$manager->lastVersion()) {
             return [];
         }
-        return \DB::transaction(function () use ($migration) {
-            $manager = new PermissionManager($this->service);
-            $manager->rollback();
-            return $migration->rollback()->pluck('migration')->all();
+        return \DB::transaction(function () use ($manager, $steps) {
+            $migrations = [];
+            for ($i = 0; $i < $steps; $i++) {
+                if (!$manager->lastVersion()) {
+                    break;
+                }
+                $migrations = array_merge($migrations, $manager->migration()->migrated()->all());
+                $manager->rollback();
+            }
+            return $migrations;
         });
     }
 
-    public function items()
+    public function mergeTo($file)
     {
         $manager = new PermissionManager($this->service);
-        $exceptScopes = ['__' . $this->service];
-        return array_values(array_map(function ($item) use ($exceptScopes) {
-            $item->addHidden(['id', 'created_at', 'updated_at']);
-            $item = $item->toArray();
-            $item['scopes'] = array_values(array_diff($item['scopes'], $exceptScopes));
-            return array_filter($item);
-        }, $manager->items()));
+        if ($manager->isEmpty()) {
+            return [[], []];
+        }
+
+        return \DB::transaction(function () use ($manager, $file) {
+            $exceptScopes = ['__' . $this->service];
+            return [
+                $manager->migration()->migrated(-1)->all(),
+                array_map(function ($item) use ($exceptScopes) {
+                    $item->addHidden(['id', 'created_at', 'updated_at']);
+                    $item = $item->toArray();
+                    $item['scopes'] = array_values(array_diff($item['scopes'], $exceptScopes));
+                    return array_filter($item);
+                }, $manager->mergeTo($file)->items())
+            ];
+        });
     }
 
     public function path()
@@ -95,6 +110,6 @@ class LocalStore
     protected function getMigrated()
     {
         $migration = app(Migration::class, ['service' => $this->service()]);
-        return $migration->migrated(-1)->pluck('migration')->all();
+        return $migration->migrated(-1)->all();
     }
 }

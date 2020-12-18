@@ -44,14 +44,11 @@ class RoleController
             'permissions' => 'array'
         ]);
         $data = \Request::only(['name', 'description', 'config', 'roles', 'permissions', 'status']);
-
+        $data['group'] = $group;
         $data['status'] = array_reduce($data['status'] ?? [], function ($mask, $status) {
             return $mask | $status;
         }, RS_READ);
 
-        if ($group) {
-            $data['group'] = $group;
-        }
         return \DB::transaction(function () use ($data) {
             if (!empty($data['roles'])) {
                 $data['status'] = $data['status'] | RS_EXTENDED;

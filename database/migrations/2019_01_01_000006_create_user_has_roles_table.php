@@ -17,7 +17,6 @@ class CreateUserHasRolesTable extends Migration
             $table->unsignedInteger('user_id');
             $table->unsignedInteger('role_id');
             $table->string('group', 32)->default('');
-            $table->boolean('disabled')->default(0);
             $table->primary(['user_id', 'role_id', 'group']);
         });
     }

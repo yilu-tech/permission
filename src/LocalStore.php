@@ -71,19 +71,18 @@ class LocalStore
         if ($manager->isEmpty()) {
             return [[], []];
         }
-
         return \DB::transaction(function () use ($manager, $file) {
-            $exceptScopes = ['__' . $this->service];
             return [
                 $manager->migration()->migrated(-1)->all(),
-                array_map(function ($item) use ($exceptScopes) {
-                    $item->addHidden(['id', 'created_at', 'updated_at']);
-                    $item = $item->toArray();
-                    $item['scopes'] = array_values(array_diff($item['scopes'], $exceptScopes));
-                    return array_filter($item);
-                }, $manager->mergeTo($file)->items())
+                $this->formatItems($manager->mergeTo($file)->items())
             ];
         });
+    }
+
+    public function items()
+    {
+        $manager = new PermissionManager($this->service);
+        return $this->formatItems($manager->items());
     }
 
     public function path()
@@ -111,5 +110,16 @@ class LocalStore
     {
         $migration = app(Migration::class, ['service' => $this->service()]);
         return $migration->migrated(-1)->all();
+    }
+
+    protected function formatItems($items)
+    {
+        $exceptScopes = ['__' . $this->service];
+        return array_map(function ($item) use ($exceptScopes) {
+            $item->addHidden(['id', 'created_at', 'updated_at']);
+            $item = $item->toArray();
+            $item['scopes'] = array_values(array_diff($item['scopes'], $exceptScopes));
+            return array_filter($item);
+        }, $items);
     }
 }

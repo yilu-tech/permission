@@ -45,6 +45,11 @@ class RemoteStore extends LocalStore
         return $this->request('getMigrated', ['steps' => -1]);
     }
 
+    public function items()
+    {
+        return $this->request('getItems');
+    }
+
     protected function request($action, $data = [], $options = [])
     {
         $client = new Client();

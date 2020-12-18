@@ -5,6 +5,7 @@ namespace YiluTech\Permission\Commands;
 
 
 use Illuminate\Console\Command;
+use YiluTech\Permission\PermissionException;
 use YiluTech\Permission\StoreManager;
 
 class MergePermissionMigrationCommand extends Command
@@ -35,13 +36,16 @@ class MergePermissionMigrationCommand extends Command
             return;
         }
 
-        $path = base_path(config('permission.migration_path', 'database/permission'));
-
-        $manager = new StoreManager(config('permission'));
-        foreach ($manager->stores() as $name => $store) {
-            $this->merge($path, $store);
+        try {
+            $path = base_path(config('permission.migration_path', 'database/permission'));
+            $manager = new StoreManager(config('permission'));
+            foreach ($manager->stores() as $name => $store) {
+                $this->merge($path, $store);
+            }
+            $this->info('merge finished.');
+        } catch (PermissionException $exception) {
+            $this->error($exception->getMessage());
         }
-        $this->info('merge finished.');
     }
 
     public function merge($directory, $store)

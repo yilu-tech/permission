@@ -35,7 +35,7 @@ class PermissionController
     public function call()
     {
         \Request::validate([
-            'action' => 'required|in:getMigrated,migrate,rollback,mergeTo',
+            'action' => 'required|in:getMigrated,getItems,migrate,rollback,mergeTo',
             'service' => 'required|string'
         ]);
         try {
@@ -49,6 +49,11 @@ class PermissionController
                 'message' => $exception->getMessage()
             ];
         }
+    }
+
+    protected function getItems($service)
+    {
+        return app(LocalStore::class, ['service' => $service])->items();
     }
 
     protected function mergeTo($service)

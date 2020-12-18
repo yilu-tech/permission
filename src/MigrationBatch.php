@@ -33,19 +33,23 @@ class MigrationBatch
             $manager = new PermissionManager($service);
             foreach ($this->files as $file => $path) {
                 [$date, $changes] = $this->read($file);
-                foreach ($changes as $name => [$action, $change]) {
-                    switch ($action) {
-                        case 'create':
-                            $manager->create($name, $change, $date);
-                            break;
-                        case 'update':
-                            $manager->update($name, $change, $date);
-                            break;
-                        case 'delete':
-                        default:
-                            $manager->delete($name);
-                            break;
+                try {
+                    foreach ($changes as $name => [$action, $change]) {
+                        switch ($action) {
+                            case 'create':
+                                $manager->create($name, $change, $date);
+                                break;
+                            case 'update':
+                                $manager->update($name, $change, $date);
+                                break;
+                            case 'delete':
+                            default:
+                                $manager->delete($name);
+                                break;
+                        }
                     }
+                } catch (PermissionException $exception) {
+                    throw new PermissionException("file[$file]: " . $exception->getMessage());
                 }
             }
             $manager->save($this->files());
@@ -74,8 +78,12 @@ class MigrationBatch
             throw new PermissionException(sprintf('file %s content type error', $file));
         }
 
-        foreach ($content as $name => &$item) {
-            $item = $this->parseContent($name, $item);
+        try {
+            foreach ($content as $name => &$item) {
+                $item = $this->parseContent($name, $item);
+            }
+        } catch (PermissionException $exception) {
+            throw new PermissionException("file[$file]: " . $exception->getMessage());
         }
         return [$this->getFileTime($file), $content];
     }

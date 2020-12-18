@@ -5,6 +5,7 @@ namespace YiluTech\Permission\Commands;
 
 
 use Illuminate\Console\Command;
+use YiluTech\Permission\PermissionException;
 use YiluTech\Permission\StoreManager;
 
 class MigratePermissionCommand extends Command
@@ -30,20 +31,24 @@ class MigratePermissionCommand extends Command
      */
     public function handle()
     {
-        $manager = new StoreManager(config('permission'));
-        $manager->loadMigrations();
+        try {
+            $manager = new StoreManager(config('permission'));
+            $manager->loadMigrations();
 
-        $count = 0;
-        foreach ($manager->stores() as $name => $store) {
-            $this->info(sprintf('migrating store[%s]', $name ?: 'default'));
-            $migration = $store->migrate();
-            $count += count($migration);
-            $this->info(implode("\n", $migration));
-        }
-        if ($count) {
-            $this->info('migrate success.');
-        } else {
-            $this->info('nothing to migrate.');
+            $count = 0;
+            foreach ($manager->stores() as $name => $store) {
+                $this->info(sprintf('migrating store[%s]', $name ?: 'default'));
+                $migration = $store->migrate();
+                $count += count($migration);
+                $this->info(implode("\n", $migration));
+            }
+            if ($count) {
+                $this->info('migrate success.');
+            } else {
+                $this->info('nothing to migrate.');
+            }
+        } catch (PermissionException $exception) {
+            $this->error($exception->getMessage());
         }
     }
 }

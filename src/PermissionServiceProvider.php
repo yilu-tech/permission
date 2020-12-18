@@ -45,6 +45,7 @@ class PermissionServiceProvider extends ServiceProvider
                 \YiluTech\Permission\Commands\RollbackPermissionCommand::class,
                 \YiluTech\Permission\Commands\MakePermissionMigrationCommand::class,
                 \YiluTech\Permission\Commands\MergePermissionMigrationCommand::class,
+                \YiluTech\Permission\Commands\UpgradeCommand::class,
             ]);
             $this->offerPublishing();
         }

@@ -14,7 +14,7 @@ class MergePermissionMigrationCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'permission:merge {--type=json}';
+    protected $signature = 'permission:merge {--yaml}';
 
     /**
      * The console command description.
@@ -30,11 +30,7 @@ class MergePermissionMigrationCommand extends Command
      */
     public function handle()
     {
-        if (!in_array($this->option('type'), ['json', 'yaml'])) {
-            $this->error(sprintf('invalid type.'));
-            return;
-        }
-        if ($this->option('type') === 'yaml' && !function_exists('yaml_emit_file')) {
+        if ($this->option('yaml') && !function_exists('yaml_emit_file')) {
             $this->error('yaml extension not support.');
             return;
         }
@@ -54,7 +50,7 @@ class MergePermissionMigrationCommand extends Command
         if ($name = $store->name()) {
             $prefix .= '_' . $name;
         }
-        $type = $this->option('type');
+        $type = $this->option('yaml') ? 'yaml' : 'json';
 
         $filename = $prefix . '.' . $type;
         $path = $directory . DIRECTORY_SEPARATOR . $filename;
@@ -85,11 +81,11 @@ class MergePermissionMigrationCommand extends Command
 
     protected function writeJson($path, $content)
     {
-        file_put_contents($path, json_encode($content, JSON_PRETTY_PRINT));
+        file_put_contents($path, json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     }
 
     protected function writeYaml($path, $content)
     {
-        yaml_emit_file($path, $content);
+        yaml_emit_file($path, $content, YAML_UTF8_ENCODING);
     }
 }

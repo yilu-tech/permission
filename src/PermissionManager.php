@@ -35,7 +35,7 @@ class PermissionManager
 
     protected function log()
     {
-        return \DB::table('permission_logs');
+        return \DB::table('permission_logs')->where('service', $this->service);
     }
 
     protected function boot()
@@ -141,13 +141,12 @@ class PermissionManager
 
     public function save(array $files)
     {
-        $this->migration->migrate($files);
-
         $version = $this->lastVersion();
         foreach ($this->changes as [$action, $item]) {
             if ($action !== 'create') {
                 $this->log()->insert([
                     'name' => $item->name,
+                    'service' => $this->service,
                     'content' => json_encode($item->getOriginal()),
                     'version' => $version,
                     'updated_at' => $item->getOriginal('updated_at')
@@ -164,6 +163,8 @@ class PermissionManager
             $this->query()->whereKey($del)->delete();
         }
         $this->changes = [];
+
+        $this->migration->migrate($files);
         return $this;
     }
 
@@ -215,9 +216,7 @@ class PermissionManager
     {
         if (!$this->isEmpty()) {
             $this->query()->update(['version' => 1]);
-            $this->log()->whereIn('version', $this->migration->batches()->map(function ($v) {
-                return $v - 1;
-            }))->delete();
+            $this->log()->delete();
             $this->migration->mergeTo($file);
         }
         return $this;

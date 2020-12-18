@@ -12,7 +12,7 @@ class MakePermissionMigrationCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'make:permission {--name=} {--type=json}';
+    protected $signature = 'make:permission {--name=} {--yaml}';
 
     /**
      * The console command description.
@@ -28,8 +28,8 @@ class MakePermissionMigrationCommand extends Command
      */
     public function handle()
     {
-        if (!in_array($type = $this->option('type'), ['json', 'yaml'])) {
-            $this->error(sprintf('invalid type.'));
+        if ($this->option('yaml') && !function_exists('yaml_emit_file')) {
+            $this->error('yaml extension not support.');
             return;
         }
 
@@ -40,6 +40,7 @@ class MakePermissionMigrationCommand extends Command
         if ($name = $this->option('name')) {
             $prefix .= '_' . $name;
         }
+        $type = $this->option('yaml') ? 'yaml' : 'json';
 
         $path = $path . DIRECTORY_SEPARATOR . $prefix . '.' . $type;
         if (file_exists($path)) {

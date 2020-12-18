@@ -15,6 +15,7 @@ class CreatePermissionLogsTable extends Migration
     {
         Schema::create('permission_logs', function (Blueprint $table) {
             $table->increments('id');
+            $table->string('service', 32);
             $table->string('name', 128)->index();
             $table->text('content');
             $table->unsignedInteger('version');

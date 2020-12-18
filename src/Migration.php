@@ -76,9 +76,7 @@ class Migration
         $this->query()->delete();
 
         $this->batches = collect();
-        $this->migrate([$file]);
-
-        return $this;
+        return $this->migrate([$file]);
     }
 
     public function migrated($steps = 1)

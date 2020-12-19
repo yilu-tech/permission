@@ -34,7 +34,7 @@ class MigrationBatch
             foreach ($this->files as $file => $path) {
                 [$date, $changes] = $this->read($file);
                 try {
-                    foreach ($changes as $name => [$action, $change]) {
+                    foreach ($changes as [$name, $action, $change]) {
                         switch ($action) {
                             case 'create':
                                 $manager->create($name, $change, $date);
@@ -79,65 +79,60 @@ class MigrationBatch
         }
 
         try {
-            foreach ($content as $name => &$item) {
-                $item = $this->parseContent($name, $item);
+            $changes = [];
+            foreach ($content as $name => $item) {
+                $changes[] = $this->parseContent($name, $item);
             }
+            return [$this->getFileTime($file), $changes];
         } catch (PermissionException $exception) {
             throw new PermissionException("file[$file]: " . $exception->getMessage());
         }
-        return [$this->getFileTime($file), $content];
     }
 
     protected function parseContent($name, $content)
     {
+        $update = substr($name, -1) === '<';
+        if ($update) {
+            $name = substr($name, 0, -1);
+        }
         if (is_string($content)) {
-            return ['update', ['name' => $content]];
+            return [$name, 'update', ['name' => $content]];
         }
         if (empty($content)) {
-            return ['delete', null];
+            return [$name, 'delete', null];
         }
-
         if (!is_array($content)) {
             throw new PermissionException(sprintf('invalid name[%s] content', $name));
         }
-
-        if (empty($content['action'])) {
-            $content['action'] = 'create';
-        }
-        switch ($content['action']) {
-            case 'update':
-                $parsed = [];
-                foreach ($content as $key => $value) {
-                    if (!preg_match('/^([<>]?)([\\w.-]+)([<>]?)$/', $key, $matches)) {
-                        throw new PermissionException(sprintf('invalid name[%s] attribute %s', $name));
-                    }
-                    $action = $matches[1] . '|' . $matches[3];
-                    if (strpos($matches[2], '.')) {
-                        [$property, $attr] = explode('.', $matches[2], 2);
-                        $parsed[$property][] = compact('action', 'value', 'attr');
-                    } else {
-                        $parsed[$matches[2]][] = compact('action', 'value');
-                    }
+        if ($update) {
+            $parsed = [];
+            foreach ($content as $key => $value) {
+                if (!preg_match('/^([<>]?)([\\w.-]+)([<>]?)$/', $key, $matches)) {
+                    throw new PermissionException(sprintf('invalid name[%s] attribute %s', $name));
                 }
-                return ['update', Arr::only($parsed, ['name', 'type', 'scopes', 'content', 'translations'])];
-            case 'create':
-                if (empty($content['type'])) {
-                    throw new PermissionException(sprintf('name[%s] type required', $name));
-                }
-                if (isset($content['scopes'])) {
-                    if (!is_array($content['scopes'])) {
-                        $content['scopes'] = [$content['scopes']];
-                    }
+                $action = $matches[1] . '|' . $matches[3];
+                if (strpos($matches[2], '.')) {
+                    [$property, $attr] = explode('.', $matches[2], 2);
+                    $parsed[$property][] = compact('action', 'value', 'attr');
                 } else {
-                    $content['scopes'] = [];
+                    $parsed[$matches[2]][] = compact('action', 'value');
                 }
-                $content['name'] = $name;
-                return ['create', Arr::only($content, ['name', 'type', 'scopes', 'content', 'translations'])];
-            case 'delete':
-                return ['delete', null];
-            default:
-                throw new PermissionException(sprintf('Invalid name[%s] action', $name));
+            }
+            return [$name, 'update', Arr::only($parsed, ['name', 'type', 'scopes', 'content', 'translations'])];
         }
+
+        if (empty($content['type'])) {
+            throw new PermissionException(sprintf('name[%s] type required', $name));
+        }
+        if (isset($content['scopes'])) {
+            if (!is_array($content['scopes'])) {
+                $content['scopes'] = [$content['scopes']];
+            }
+        } else {
+            $content['scopes'] = [];
+        }
+        $content['name'] = $name;
+        return [$name, 'create', Arr::only($content, ['name', 'type', 'scopes', 'content', 'translations'])];
     }
 
     protected function getFileTime($file)

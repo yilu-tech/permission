@@ -119,7 +119,7 @@ class LocalStore
             $item->addHidden(['id', 'created_at', 'updated_at']);
             $item = $item->toArray();
             $item['scopes'] = array_values(array_diff($item['scopes'], $exceptScopes));
-            return array_filter($item);
+            return $item;
         }, $items);
     }
 }

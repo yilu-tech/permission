@@ -94,16 +94,13 @@ class MakePermissionMigrationCommand extends Command
             }
             $old = $origin[$name];
             if (!empty($diff = array_diff($old['scopes'], $item['scopes']))) {
-                $changes[$name]['scopes>'] = array_values($diff);
+                $changes[$name . '<']['scopes>'] = array_values($diff);
             }
             if (!empty($diff = array_diff($item['scopes'], $old['scopes']))) {
-                $changes[$name]['scopes<'] = array_values($diff);
+                $changes[$name . '<']['scopes<'] = array_values($diff);
             }
             if ($old['content'] != $item['content']) {
-                $changes[$name]['content'] = $item['content'];
-            }
-            if (isset($changes[$name])) {
-                $changes[$name]['action'] = 'update';
+                $changes[$name . '<']['content'] = $item['content'];
             }
             unset($origin[$name]);
         }

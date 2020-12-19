@@ -46,6 +46,20 @@ class PermissionManager
         });
     }
 
+    public function match($name)
+    {
+        if (strpos($name, '*') === false) {
+            if (isset($this->items[$name])) {
+                return [$this->items[$name]];
+            }
+            return [];
+        }
+        $pattern = '/^' . str_replace(['.', '**', '*', '%'], ['\.', '.%', '[\w\-]+', '*'], $name) . '$/';
+        return array_filter($this->items, function ($name) use ($pattern) {
+            return preg_match($pattern, $name);
+        }, ARRAY_FILTER_USE_KEY);
+    }
+
     public function migration()
     {
         return $this->migration;
@@ -81,61 +95,57 @@ class PermissionManager
 
         [$action, $item] = $this->getChange($name);
         if ($action === 'delete') {
+            unset($this->changes[$name]);
             $this->changes[$name] = ['update', $item->fill($data)];
         } else {
             $data['created_at'] = $date;
             $item = new Permission($data);
             $this->changes[$name] = ['create', $item];
         }
-
         $this->items[$name] = $item;
-
         return $this;
     }
 
     public function update($name, $changes, $date)
     {
-        if (empty($this->items[$name])) {
-            throw new PermissionException(sprintf('permission name "%s" not found, can not update', $name));
+        if (empty($matches = $this->match($name))) {
+            throw new PermissionException(sprintf('permission name "%s" not match, nothing to update', $name));
         }
-        $item = $this->items[$name];
-        $item->fill($this->applyChange($item->toArray(), $changes));
-
-        [$action, $curr] = $this->getChange($name);
-        if ($curr) {
-            if ($item->name !== $name) {
-                $this->changes[$item->name] = [$action, $item];
+        foreach ($matches as $item) {
+            $name = $item->getAttribute('name');
+            $item->fill($this->applyChange($item->toArray(), $changes));
+            [$action, $curr] = $this->getChange($name);
+            if ($curr) {
                 unset($this->changes[$name]);
+                $this->changes[$item->name] = [$action, $item];
+            } else {
+                if ($item->isDirty()) {
+                    $item->updated_at = $date;
+                    $this->changes[$item->name] = ['update', $item];
+                }
             }
-        } else {
-            if ($item->isDirty()) {
-                $item->updated_at = $date;
-                $this->changes[$item->name] = ['update', $item];
+            if ($item->name !== $name) {
+                $this->items[$item->name] = $item;
+                unset($this->items[$name]);
             }
         }
-
-        if ($item->name !== $name) {
-            $this->items[$item->name] = $item;
-            unset($this->items[$name]);
-        }
-
         return $this;
     }
 
     public function delete($name)
     {
-        if (empty($this->items[$name])) {
-            throw new PermissionException(sprintf('permission name "%s" not found, can not delete', $name));
+        if (empty($matches = $this->match($name))) {
+            throw new PermissionException(sprintf('permission name "%s" not match, nothing to delete', $name));
         }
-
-        [$action, $item] = $this->getChange($name);
-        if ($action === 'create') {
+        foreach ($matches as $item) {
+            $name = $item->getAttribute('name');
+            [$action, $item] = $this->getChange($name);
             unset($this->changes[$name]);
-        } else {
-            $this->changes[$name] = ['delete', $this->items[$name]];
+            if ($action !== 'create') {
+                $this->changes[$name] = ['delete', $this->items[$name]];
+            }
+            unset($this->items[$name]);
         }
-        unset($this->items[$name]);
-
         return $this;
     }
 
@@ -179,7 +189,7 @@ class PermissionManager
             return $item->version == $version;
         });
 
-        $originals = $this->log()->where('version', $version - 1)->get();
+        $originals = $this->log()->where('version', $version - 1)->orderByDesc('id')->get();
         foreach ($originals as $original) {
             $content = json_decode($original->content, JSON_OBJECT_AS_ARRAY);
             if (isset($current[$original->name])) {
@@ -238,10 +248,10 @@ class PermissionManager
                     case '>|':
                         if (isset($change['attr'])) {
                             $value = data_get($origin[$key], $change['attr']);
-                            Utils::data_merge($value, $change['value']);
+                            Utils::data_merge($value, $change['value'], $change['action'] === '|<');
                             data_set($origin[$key], $change['attr'], $value);
                         } else {
-                            Utils::data_merge($origin[$key], $change['value']);
+                            Utils::data_merge($origin[$key], $change['value'], $change['action'] === '|<');
                         }
                         break;
                     case '|>':
@@ -251,11 +261,11 @@ class PermissionManager
                                 Utils::data_del($origin[$key], $change['attr']);
                             } else {
                                 $value = data_get($origin[$key], $change['attr']);
-                                Utils::data_split($value, $change['value']);
+                                Utils::data_split($value, $change['value'], $change['action'] === '|>');
                                 data_set($origin[$key], $change['attr'], $value);
                             }
                         } else {
-                            Utils::data_split($origin[$key], $change['value']);
+                            Utils::data_split($origin[$key], $change['value'], $change['action'] === '|>');
                         }
                         break;
                     default:

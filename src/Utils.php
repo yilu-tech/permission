@@ -31,7 +31,7 @@ class Utils
         }
     }
 
-    public static function data_split(&$target, $data)
+    public static function data_split(&$target, $data, $right = true)
     {
         if (is_null($data)) {
             $target = $data;

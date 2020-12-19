@@ -111,7 +111,7 @@ class MigrationBatch
                     if (!preg_match('/^([<>]?)([\\w.-]+)([<>]?)$/', $key, $matches)) {
                         throw new PermissionException(sprintf('invalid name[%s] attribute %s', $name));
                     }
-                    $action = $matches[1] ? $matches[1] . '|' : $matches[3] ? '|' . $matches[3] : '&';
+                    $action = $matches[1] . '|' . $matches[3];
                     if (strpos($matches[2], '.')) {
                         [$property, $attr] = explode('.', $matches[2], 2);
                         $parsed[$property][] = compact('action', 'value', 'attr');

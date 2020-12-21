@@ -91,9 +91,8 @@ class MigrationBatch
 
     protected function parseContent($name, $content)
     {
-        $update = substr($name, -1) === '<';
-        if ($update) {
-            $name = substr($name, 0, -1);
+        if ($update = $name[0] === '@') {
+            $name = substr($name, 1);
         }
         if (is_string($content)) {
             return [$name, 'update', ['name' => $content]];

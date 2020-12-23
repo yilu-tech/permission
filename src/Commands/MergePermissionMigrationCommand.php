@@ -69,7 +69,8 @@ class MergePermissionMigrationCommand extends Command
             $this->info(sprintf('store[%s] nothing to merge.', $name ?: 'default'));
         } else {
             call_user_func([$this, 'write' . ucfirst($type)], $path, $items);
-            $this->info(sprintf('store[%s] generate to file %s.', $name ?: 'default', $path));
+            $this->info(sprintf('store[%s]', $name ?: 'default'));
+            $this->info(sprintf('generate file %s.', $path));
 
             foreach ($files as $file) {
                 $path = $directory . DIRECTORY_SEPARATOR . $file;

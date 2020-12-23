@@ -9,7 +9,7 @@ use Symfony\Component\HttpFoundation\File\File;
 
 class MigrationBatch
 {
-    protected $files;
+    protected $files = [];
 
     public function __construct(array $files)
     {
@@ -30,30 +30,51 @@ class MigrationBatch
     public function migrate($service)
     {
         \DB::transaction(function () use ($service) {
-            $manager = new PermissionManager($service);
-            foreach ($this->files as $file => $path) {
-                [$date, $changes] = $this->read($file);
-                try {
-                    foreach ($changes as [$name, $action, $change]) {
-                        switch ($action) {
-                            case 'create':
-                                $manager->create($name, $change, $date);
-                                break;
-                            case 'update':
-                                $manager->update($name, $change, $date);
-                                break;
-                            case 'delete':
-                            default:
-                                $manager->delete($name);
-                                break;
-                        }
-                    }
-                } catch (PermissionException $exception) {
-                    throw new PermissionException("file[$file]: " . $exception->getMessage());
-                }
-            }
-            $manager->save($this->files());
+            $this->applyChanges($service)->save($this->files());
         });
+    }
+
+    public function getChanges($service): array
+    {
+        $manager = $this->applyChanges($service);
+        $changes = [];
+        foreach ($manager->getChanges() as [$action, $item]) {
+            if ($action === 'delete') {
+                $changes[$item->name] = [$action, null];
+            } else if ($action === 'create') {
+                $changes[$item->name] = [$action, $item->getAttributes()];
+            } else if (!empty($dirty = $item->getDirty())) {
+                $changes[$item->getOriginal('name')] = [$action, $dirty];
+            }
+        }
+        return $changes;
+    }
+
+    protected function applyChanges($service): PermissionManager
+    {
+        $manager = new PermissionManager($service);
+        foreach ($this->files as $file => $path) {
+            [$date, $changes] = $this->read($file);
+            try {
+                foreach ($changes as [$name, $action, $change]) {
+                    switch ($action) {
+                        case 'create':
+                            $manager->create($name, $change, $date);
+                            break;
+                        case 'update':
+                            $manager->update($name, $change, $date);
+                            break;
+                        case 'delete':
+                        default:
+                            $manager->delete($name);
+                            break;
+                    }
+                }
+            } catch (PermissionException $exception) {
+                throw new PermissionException("file[$file]: " . $exception->getMessage());
+            }
+        }
+        return $manager;
     }
 
     protected function read($file)
@@ -107,7 +128,7 @@ class MigrationBatch
             $parsed = [];
             foreach ($content as $key => $value) {
                 if (!preg_match('/^([<>]?)([\\w.-]+)([<>]?)$/', $key, $matches)) {
-                    throw new PermissionException(sprintf('invalid name[%s] attribute %s', $name));
+                    throw new PermissionException(sprintf('invalid name[%s] attribute %s', $name, $key));
                 }
                 $action = $matches[1] . '|' . $matches[3];
                 if (strpos($matches[2], '.')) {

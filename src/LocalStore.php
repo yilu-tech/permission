@@ -36,6 +36,13 @@ class LocalStore
         }
     }
 
+    public function test()
+    {
+        $migrations = $this->getUndoMigrations();
+        $batch = new MigrationBatch($migrations);
+        return [array_keys($migrations), $batch->getChanges($this->service)];
+    }
+
     public function migrate()
     {
         return array_keys(tap($this->getUndoMigrations(), function ($migrations) {

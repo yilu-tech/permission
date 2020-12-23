@@ -85,6 +85,11 @@ class PermissionManager
         return $this->changes[$name] ?? [null, null];
     }
 
+    public function getChanges()
+    {
+        return $this->changes;
+    }
+
     public function create($name, $data, $date)
     {
         if (isset($this->items[$name])) {

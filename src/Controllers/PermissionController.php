@@ -35,7 +35,7 @@ class PermissionController
     public function call()
     {
         \Request::validate([
-            'action' => 'required|in:getMigrated,getItems,migrate,rollback,mergeTo',
+            'action' => 'required|in:getMigrated,getItems,getChanges,migrate,rollback,mergeTo',
             'service' => 'required|string'
         ]);
         try {
@@ -80,6 +80,16 @@ class PermissionController
         ]);
         $batch = app(MigrationBatch::class, ['files' => \Request::file('migrations')]);
         $batch->migrate($service);
+    }
+
+    protected function getChanges($service)
+    {
+        \Request::validate([
+            'migrations' => 'array|min:1',
+            'migrations.*' => 'file|mimes:txt',
+        ]);
+        $batch = app(MigrationBatch::class, ['files' => \Request::file('migrations')]);
+        $batch->getChanges($service);
     }
 
     protected function rollback($service)

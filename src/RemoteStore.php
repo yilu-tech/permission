@@ -45,6 +45,19 @@ class RemoteStore extends LocalStore
         return $this->request('getMigrated', ['steps' => -1]);
     }
 
+    public function test()
+    {
+        $migrations = $this->getUndoMigrations();
+        if (empty($migrations)) {
+            return [[], []];
+        }
+        $multipart = [];
+        foreach ($migrations as $name => $path) {
+            $multipart[] = ['name' => 'migrations[]', 'filename' => $name, 'contents' => fopen($path, 'r')];
+        }
+        return [array_keys($migrations), $this->request('getChanges', [], compact('multipart'))];
+    }
+
     public function items()
     {
         return $this->request('getItems');

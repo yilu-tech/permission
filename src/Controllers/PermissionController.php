@@ -76,7 +76,7 @@ class PermissionController
     {
         \Request::validate([
             'migrations' => 'array|min:1',
-            'migrations.*' => 'file|mimes:txt',
+            'migrations.*' => 'file',
         ]);
         $batch = app(MigrationBatch::class, ['files' => \Request::file('migrations')]);
         $batch->migrate($service);
@@ -86,7 +86,7 @@ class PermissionController
     {
         \Request::validate([
             'migrations' => 'array|min:1',
-            'migrations.*' => 'file|mimes:txt',
+            'migrations.*' => 'file',
         ]);
         $batch = app(MigrationBatch::class, ['files' => \Request::file('migrations')]);
         $batch->getChanges($service);

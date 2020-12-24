@@ -105,6 +105,11 @@ class LocalStore
         return false;
     }
 
+    public function getMigrations()
+    {
+        return $this->migrations;
+    }
+
     public function getUndoMigrations()
     {
         $migrated = $this->getMigrated();

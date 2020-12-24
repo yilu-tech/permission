@@ -6,6 +6,8 @@ namespace YiluTech\Permission\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Arr;
 use YiluTech\Permission\LocalStore;
+use YiluTech\Permission\MigrationBatch;
+use YiluTech\Permission\PermissionCollection;
 use YiluTech\Permission\PermissionException;
 use YiluTech\Permission\RoutePermission;
 use YiluTech\Permission\StoreManager;
@@ -17,7 +19,7 @@ class MakePermissionMigrationCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'make:permission {--name=} {--scopes=} {--yaml} {--empty}';
+    protected $signature = 'make:permission {--name=} {--scopes=} {--yaml} {--empty} {--db}';
 
     /**
      * The console command description.
@@ -68,6 +70,7 @@ class MakePermissionMigrationCommand extends Command
             if ($this->option('empty')) {
                 $changes = [];
             } else {
+                $manager->loadMigrations();
                 $changes = $this->getChanges($manager->stores($name)[0]);
             }
             call_user_func([$this, 'write' . ucfirst($type)], $path, $changes);
@@ -81,7 +84,7 @@ class MakePermissionMigrationCommand extends Command
 
     protected function getChanges(LocalStore $store)
     {
-        $origin = array_filter($store->items(), function ($item) {
+        $origin = array_filter($this->getOriginal($store), function ($item) {
             return $item['type'] === 'api';
         });
 
@@ -108,6 +111,20 @@ class MakePermissionMigrationCommand extends Command
             $changes[$name] = null;
         }
         return $changes;
+    }
+
+    protected function getOriginal(LocalStore $store)
+    {
+        if ($this->option('db')) {
+            return $store->items();
+        }
+        if (empty($migrations = $store->getMigrations())) {
+            return [];
+        }
+        $items = tap(new PermissionCollection(), [new MigrationBatch($migrations), 'applyChanges'])->items();
+        return array_map(function ($item) {
+            return $item->toArray();
+        }, $items);
     }
 
     protected function getRoutePermission()

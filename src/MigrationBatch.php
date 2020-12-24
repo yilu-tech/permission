@@ -30,13 +30,14 @@ class MigrationBatch
     public function migrate($service)
     {
         \DB::transaction(function () use ($service) {
-            $this->applyChanges($service)->save($this->files());
+            tap(new PermissionManager($service), [$this, 'applyChanges'])->save($this->files());
         });
     }
 
     public function getChanges($service): array
     {
-        $manager = $this->applyChanges($service);
+        $manager = new PermissionManager($service);
+        $this->applyChanges($manager);
         $changes = [];
         foreach ($manager->getChanges() as [$action, $item]) {
             if ($action === 'delete') {
@@ -50,23 +51,22 @@ class MigrationBatch
         return $changes;
     }
 
-    protected function applyChanges($service): PermissionManager
+    public function applyChanges(PermissionCollection $collection)
     {
-        $manager = new PermissionManager($service);
         foreach ($this->files as $file => $path) {
             [$date, $changes] = $this->read($file);
             try {
                 foreach ($changes as [$name, $action, $change]) {
                     switch ($action) {
                         case 'create':
-                            $manager->create($name, $change, $date);
+                            $collection->create($name, $change, $date);
                             break;
                         case 'update':
-                            $manager->update($name, $change, $date);
+                            $collection->update($name, $change, $date);
                             break;
                         case 'delete':
                         default:
-                            $manager->delete($name);
+                            $collection->delete($name);
                             break;
                     }
                 }
@@ -74,7 +74,6 @@ class MigrationBatch
                 throw new PermissionException("file[$file]: " . $exception->getMessage());
             }
         }
-        return $manager;
     }
 
     protected function read($file)

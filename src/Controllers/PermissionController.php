@@ -89,7 +89,7 @@ class PermissionController
             'migrations.*' => 'file',
         ]);
         $batch = app(MigrationBatch::class, ['files' => \Request::file('migrations')]);
-        $batch->getChanges($service);
+        return $batch->getChanges($service);
     }
 
     protected function rollback($service)

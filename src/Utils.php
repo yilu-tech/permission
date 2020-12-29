@@ -36,7 +36,17 @@ class Utils
         if (is_null($data)) {
             $target = $data;
         } else if (is_string($target)) {
-            $target = str_replace((string)$data, '', $target);
+            $data = (string)$data;
+            if ($right) {
+                $str = strrev($target);
+                if (strpos($str, strrev($data)) === 0) {
+                    $target = strrev(substr($str, strlen($data)));
+                }
+            } else {
+                if (strpos($target, $data) === 0) {
+                    $target = substr($target, strlen($data));
+                }
+            }
         } else if (is_array($target)) {
             if (Arr::isAssoc($target)) {
                 $target = array_diff_assoc($target, (array)$data);

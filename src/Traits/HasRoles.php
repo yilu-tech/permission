@@ -85,7 +85,7 @@ trait HasRoles
             $role->group = $this->makeRoleGroup($role);
         });
 
-        $attach = $roles->diffUsing($this->roles(), function ($a, $b) {
+        $attach = $roles->diffUsing($this->roles($group), function ($a, $b) {
             if ($a->id == $b->id) {
                 return $a->group == $b->pivot->group ? 0 : -1;
             }

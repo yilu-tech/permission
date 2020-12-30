@@ -15,7 +15,7 @@ class MergePermissionMigrationCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'permission:merge {--yaml}';
+    protected $signature = 'permission:merge {--yaml : 生成yaml格式文件,需要php yaml扩展支持}';
 
     /**
      * The console command description.

@@ -51,7 +51,7 @@ class LocalStore
         }
     }
 
-    public function test()
+    public function getChanges()
     {
         $migrations = $this->getUndoMigrations();
         $batch = new MigrationBatch($migrations);

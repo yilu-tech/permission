@@ -45,7 +45,7 @@ class RemoteStore extends LocalStore
         return $this->request('getMigrated', ['steps' => -1]);
     }
 
-    public function test()
+    public function getChanges()
     {
         $migrations = $this->getUndoMigrations();
         if (empty($migrations)) {

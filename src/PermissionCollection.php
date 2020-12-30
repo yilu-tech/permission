@@ -7,6 +7,9 @@ use YiluTech\Permission\Models\Permission;
 
 class PermissionCollection
 {
+    /**
+     * @var Permission[]
+     */
     protected $items = [];
 
     protected $changes = [];
@@ -104,6 +107,17 @@ class PermissionCollection
                 $this->changes[$name] = ['delete', $this->items[$name]];
             }
             unset($this->items[$name]);
+        }
+        return $this;
+    }
+
+    public function sync(): self
+    {
+        if (!empty($this->changes)) {
+            foreach ($this->items as $item) {
+                $item->syncOriginal();
+            }
+            $this->changes = [];
         }
         return $this;
     }

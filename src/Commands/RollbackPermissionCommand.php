@@ -15,7 +15,7 @@ class RollbackPermissionCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'permission:rollback {--steps=1}';
+    protected $signature = 'permission:rollback {--steps=1 : 回滚次数}';
 
     /**
      * The console command description.

@@ -34,12 +34,22 @@ class MigrationBatch
         });
     }
 
-    public function getChanges($service): array
+    public function toCollection(): PermissionCollection
     {
-        $manager = new PermissionManager($service);
-        $this->applyChanges($manager);
+        return tap(new PermissionCollection(), function ($collection) {
+            $this->applyChanges($collection);
+            $collection->sync();
+        });
+    }
+
+    public function getChanges($collection): array
+    {
+        if (is_string($collection)) {
+            $collection = new PermissionManager($collection);
+        }
+        $this->applyChanges($collection);
         $changes = [];
-        foreach ($manager->getChanges() as [$action, $item]) {
+        foreach ($collection->getChanges() as [$action, $item]) {
             if ($action === 'delete') {
                 $changes[$item->name] = [$action, null];
             } else if ($action === 'create') {

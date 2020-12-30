@@ -19,7 +19,12 @@ class MakePermissionMigrationCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'make:permission {--name=} {--scopes=} {--yaml} {--empty} {--db}';
+    protected $signature = 'make:permission
+    {--name= : 文件分组名称}
+    {--scopes= : 根据权限scopes过滤,正则格式,默认从配置文件读取}
+    {--yaml : 生成yaml格式文件,需要php yaml扩展支持}
+    {--empty : 生成空文件,默认写入差异路由权限}
+    {--db : 从数据据库比对差异,默认从文件比对差异}';
 
     /**
      * The console command description.

@@ -10,10 +10,10 @@ class RemoteStore extends LocalStore
 {
     protected $url;
 
-    public function __construct($service, $name, $url)
+    public function __construct($service, $options)
     {
-        parent::__construct($service, $name);
-        $this->url = $url . '/permission/call';
+        parent::__construct($service, $options);
+        $this->url = $this->option('url') . '/permission/call';
     }
 
     public function migrate()

@@ -27,25 +27,23 @@ class StoreManager
         if (!empty($this->config['endpoints'])) {
             if (array_key_exists('local', $this->config)) {
                 $this->stores[] = new LocalStore($service, $this->config['local']);
-                $this->tags[] = $this->config['local'];
             }
             if (is_array($this->config['endpoints'])) {
                 foreach ($this->config['endpoints'] as $key => $endpoint) {
-                    if (is_int($key)) {
-                        $key = null;
-                    }
-                    $this->stores[] = new RemoteStore($service, $key, $endpoint);
-                    $this->tags[] = $key;
+                    $options = is_array($endpoint) ? $endpoint : ['url' => $endpoint];
+                    $options['name'] = is_int($key) ? null : $key;
+                    $this->stores[] = new RemoteStore($service, $options);
                 }
             } else {
-                $this->stores[] = new RemoteStore($service, null, $this->config['endpoints']);
-                $this->tags[] = null;
+                $this->stores[] = new RemoteStore($service, ['url' => $this->config['endpoints']]);
             }
         } else {
             $this->stores[] = new LocalStore($service, $this->config['local'] ?? null);
-            $this->tags[] = $this->config['local'] ?? null;
         }
-        $this->tags = array_unique($this->tags);
+
+        $this->tags = array_unique(array_map(function ($store) {
+            return $store->name();
+        }, $this->stores));
     }
 
     public function loadMigrations()

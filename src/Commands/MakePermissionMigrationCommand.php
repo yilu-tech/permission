@@ -84,6 +84,9 @@ class MakePermissionMigrationCommand extends Command
 
     protected function getChanges(LocalStore $store)
     {
+        if (!$this->option('scopes')) {
+            $this->input->setOption('scopes', $store->option('scopes'));
+        }
         $origin = array_filter($this->getOriginal($store), function ($item) {
             return $item['type'] === 'api';
         });
@@ -131,7 +134,7 @@ class MakePermissionMigrationCommand extends Command
     {
         $filter = null;
         if ($this->option('scopes')) {
-            $filter = '/' . $this->option('scopes') . '/';
+            $filter = '/' . str_replace('.', '\.', $this->option('scopes')) . '/';
         }
         $items = [];
         foreach (RoutePermission::all() as $item) {

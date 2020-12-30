@@ -12,10 +12,25 @@ class LocalStore
 
     protected $migrations = [];
 
-    public function __construct($service, $name = null)
+    protected $options = [];
+
+    public function __construct($service, $options = [])
     {
-        $this->name = $name;
+        if (is_string($options)) {
+            $options = ['name' => $options];
+        }
+        $this->options = (array)$options;
+
+        $this->name = $this->option('name');
         $this->service = $service;
+    }
+
+    public function option($name = null, $default = null)
+    {
+        if ($name) {
+            return $this->options[$name] ?? $default;
+        }
+        return $this->options;
     }
 
     public function name()

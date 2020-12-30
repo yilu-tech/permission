@@ -3,6 +3,7 @@
 return [
     // 'endpoints' => [
     //     'http://examlple/admin',
+    //     ['url' => 'http://examlple/admin', 'scopes' => 'staff|member'],
     //     'backend' => 'http://examlple/admin',
     // ],
     // 'local' => null, // default

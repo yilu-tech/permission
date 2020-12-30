@@ -38,25 +38,34 @@ class Utils
         } else if (is_string($target)) {
             $data = (string)$data;
             if ($right) {
-                $str = strrev($target);
-                if (strpos($str, strrev($data)) === 0) {
-                    $target = strrev(substr($str, strlen($data)));
+                if (substr_compare($target, $data, $offset = -strlen($data)) === 0) {
+                    $target = substr($target, 0, $offset);
                 }
             } else {
-                if (strpos($target, $data) === 0) {
-                    $target = substr($target, strlen($data));
+                if (strncmp($target, $data, $offset = strlen($data)) === 0) {
+                    $target = substr($target, $offset);
                 }
             }
         } else if (is_array($target)) {
+            $data = (array)$data;
+            $argv = $right ? [$target, $data] : [$data, $target];
             if (Arr::isAssoc($target)) {
-                $target = array_diff_assoc($target, (array)$data);
+                $target = array_diff_assoc(...$argv);
             } else {
-                $target = array_values(array_diff($target, (array)$data));
+                $target = array_values(array_diff(...$argv));
             }
         } else if (is_float($target)) {
-            $target -= (float)$data;
+            if ($right) {
+                $target -= (float)$data;
+            } else {
+                $target = (float)$data - $target;
+            }
         } else if (is_int($target)) {
-            $target -= (int)$data;
+            if ($right) {
+                $target -= (int)$data;
+            } else {
+                $target = (int)$data - $target;
+            }
         }
     }
 

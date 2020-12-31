@@ -157,7 +157,7 @@ class MakePermissionMigrationCommand extends Command
                 $items[$name] = $data;
             } else {
                 if (Arr::isAssoc($items[$name]['content'])) {
-                    $new[$name]['content'] = [$items[$name]['content'], $data['content']];
+                    $items[$name]['content'] = [$items[$name]['content'], $data['content']];
                 } else {
                     $items[$name]['content'][] = $data['content'];
                 }

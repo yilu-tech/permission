@@ -65,7 +65,7 @@ class PermissionManager extends PermissionCollection
             if ($action === 'delete') {
                 $del[] = $item->getKey();
             } else {
-                $item->scopes = array_merge(['__' . $this->service], $item->scopes);
+                $item->scopes = array_values(array_unique(array_merge(['__' . $this->service], $item->scopes)));
                 $item->version = $version + 1;
                 $item->save();
             }

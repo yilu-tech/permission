@@ -96,8 +96,10 @@ class MigratePermissionCommand extends Command
         $files = $this->option('test') ?: 1;
         foreach ($manager->stores() as $store) {
             $this->info(sprintf('testing store[%s] migrations', $store->name() ?: 'default'));
-            $didMigrations = array_slice($store->getMigrations(), 0, -$files);
-            $undoMigrations = array_slice($store->getMigrations(), -$files);
+            $migrations = $store->getMigrations();
+            ksort($migrations);
+            $didMigrations = array_slice($migrations, 0, -$files);
+            $undoMigrations = array_slice($migrations, -$files);
 
             if (empty($undoMigrations)) {
                 $this->info('no file to test.');

@@ -156,6 +156,7 @@ class MakePermissionMigrationCommand extends Command
             if (empty($items[$name])) {
                 $items[$name] = $data;
             } else {
+                $items[$name]['scopes'] = array_values(array_merge($items[$name]['scopes'], $data['scopes']));
                 if (Arr::isAssoc($items[$name]['content'])) {
                     $items[$name]['content'] = [$items[$name]['content'], $data['content']];
                 } else {

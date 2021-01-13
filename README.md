@@ -1,52 +1,190 @@
-#### 配着说明
-权限采用中心化存储、管理，其它服务分别向中心服务提供权限。
+# 权限包说明
 
-`remote`: 设置中心服务地址，未设置则表示为中心服务；
+## artisan 命令
+* vendor:publish --tag=permission-migrations --force : 生成数据库表文件
 
-`server`: 服务名称，每个服务名称唯一；
+* vendor:publish --tag=permission-config --force : 生成配置文件
+    
+* make:permission : 用于生成权限文件, 默认文件内容为`json`格式
+    * --name : 当`endpoints`有多个时, 用于指定`endopint`名
+    * --scopes : 用于指定权限组, 默认对`endpoints`中定义的`scopes`进行过滤筛选
+    * --yml : 生成文件内容为`yaml`格式
+    * --empty : 生成空文件, 默认写入差异路由权限
+    * --db : 从数据据库比对差异,默认从文件比对差异
 
-`migration_path`: 权限存储路径，默认为:database/permission/permission.log
+* permission:migrate : 写入权限操
+    * --test : 测试migration文件生成差异信息, 逆向读取 N 个测试文件 [default: "N"]
+    * --db : 从数据库比对进行测试
 
-#### 路由权限
-路由的`name`即为权限的名称, 路由新增 `name_prefix` name前缀配置，连接符为 `.`；  
-定义规则： 授权组|...@!名称  
-一个权限可以授权多个组；  
-`!`表示权限不经过rbac认证  
+* permission:rollback : 回滚权限操作
+    * --steps : 回滚次数 [default: "1]
 
-#### 命令说明
-`permission:record`: 将当前服务的权限变动写入本地文件  
-            --auth=: 过滤授权组  
-            --db: 将本地变动信息写入数据库  
-            --not-ignore：记录忽略的权限  
-常用说明：在提交代码之前，先执行`permission:record`命令，权限变动会随着git记录提交到代码库，在服务器更新代码之后再执行`permission:record --db`将记录写入数据库。
+* permission:merge : 将本地多个权限文件合并成单个文件 (当数据库表`permission_migrations`为空时, 可从`permissions`表中读取当前权限,并生成当前数据库中对应权限文件)
+    * --yaml : 生成yaml格式文件,需要php yaml扩展支持
+        
+## 配置文件
 
-`permission:rollback {date}`: 回滚权限, date：回滚的日期，若为null则清除当前服务的所有权限；
+* server : 当前服务名
+* endopoints : 权限提交节点
 
-#### 初始角色
-通过DB seeder 实现。
-角色说明：
-- name: 角色名称，在同一用户组下唯一
-- alias：角色别名，全局唯一
-- group：用户组，可为空
-- status：角色状态
-  - RS_ADMIN：管理员
-  - RS_BASIC：基础角色，当用户加入用户组时会默认给予当前角色
-  - RS_SYS：系统角色，不能删除
-  - RS_READ：可显示
-  - RS_WRITE：可修改
-  - RS_EXTEND：可继承
+    例1: member-service 作为用户端, staff-service 作为服务端
+    ```php
+    /**
+        * member-service
+        * config/permission.php
+        */
 
-例：
-```php
-    $roles = [
-         ['name' => '基础功能', 'alias' => 'city_basic', 'group' => 'city', 'status' => RS_BASIC | RS_SYS],
-         ['name' => '管理员', 'alias' => 'hall_admin', 'group' => 'hall', 'status' => RS_ADMIN | RS_SYS | RS_READ],
-         ['name' => '管理员', 'alias' => 'admin', 'status' => RS_ADMIN | RS_SYS | RS_READ],
-         ['name' => '教练', 'alias' => 'coach', 'status' => RS_SYS | RS_READ | RS_WRITE],
-         ['name' => '销售员', 'alias' => 'salesman', 'group' => 'hall', 'status' => RS_SYS | RS_READ | RS_WRITE]
-     ];
+    <?php
 
-     foreach ($roles as $role) {
-         \YiluTech\Permission\Models\Role::create($role);
-     }
-```
+    return [
+        'server' => 'member'
+
+        'endpoints' => [
+            'staff' => [
+                'url' => 'http://api.test.com/staff',
+                'scopes' => 'admin',
+            ]
+        ];
+    ];
+
+    // 以上配置亦可简写成如下形式
+    return [
+        'server' => 'member'
+
+        'endpoints' => 'http://api.test.com/staff',
+    ];
+    ```
+
+    ```php
+    /**
+        * staff-service
+        * config/permission.php
+        */
+
+    <?php
+
+    return [
+        'server' => 'staff'
+
+        'local' => [
+            'name' => 'admin', 'scopes' => 'admin'
+        ],
+    ];
+    ```
+
+    例2: member-service 作为用户端, staff-service 同时作为用户端和服务端, management 用作服务端
+    ```php
+    /**
+        * member-service
+        * config/permission.php
+        */
+
+    <?php
+
+    return [
+        'server' => 'member'
+
+        'endpoints' => [
+            'staff' => [
+                'url' => 'http://api.test.com/staff',
+                'scopes' => 'admin',
+            ],
+            'management' => [
+                'url' => 'http://api.test.com/management',
+                'scopes' => 'management',
+            ],
+        ];
+    ];
+    ```
+
+    ```php
+    /**
+        * staff-service
+        * config/permission.php
+        */
+
+    <?php
+
+    return [
+        'server' => 'staff'
+
+        'local' => [
+            'name' => 'admin', 'scopes' => 'admin'
+        ],
+
+        'endpoints' => [
+            'management' => [
+                'url' => 'http://api.test.com/management',
+                'scopes' => 'management',
+            ],
+        ]
+    ];
+    ```
+
+## 权限文件
+
+1. json 格式说明
+
+    ```json
+    {
+        "@user.create": {         // @ 表示修改
+            "type": "api",
+            "scopes<": [            // 表示向scopes追加
+                "admin",
+            ],
+            "scopes>": [            // 表示从scopes移除
+                "admin.xxx",
+            ],
+            "content": {
+                "url": "\/user\/create",
+                "method": "POST"
+            },
+            "translations.cn": {
+                "content": "翻译",
+                "description": "描述",
+            }
+
+        },
+        "user.list": {          // 表示添加
+            "type": "api",
+            "scopes": [],
+            "content": {
+                "url": "\/user\/list",
+                "method": "GET"
+            },
+            "translations": {
+                "cn": {
+                    "content": "翻译",
+                    "description": "描述"
+                }
+            }
+        },
+        "user.detail": null     // 表示删除
+    }
+    ```
+
+2. yaml 格式说明
+
+    ```yaml
+    '@user.create':
+      type: api
+      scopes:
+        - admin
+      content:
+        url: user/create
+        method: POST
+      translations.cn:
+        content: 翻译
+        description: 描述
+    user.list:
+      type: api
+      scopes:
+      content:
+        url: user/list
+        method: GET
+      translations:
+        cn:
+          content: 翻译
+          description: 描述
+    user.detail:
+    ```

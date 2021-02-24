@@ -39,7 +39,7 @@ class Permission extends Model
             $lang = app()->getLocale();
         }
         if ($lang) {
-            $query->addSelect(\DB::raw("JSON_EXTRACT(`translations`, '$.$lang') as translations"));
+            $query->addSelect(\DB::raw(sprintf('JSON_EXTRACT(`translations`, \'$."%s"\') as translations', $lang)));
         }
         return $query;
     }

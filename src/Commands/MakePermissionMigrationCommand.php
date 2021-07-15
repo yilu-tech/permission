@@ -23,7 +23,8 @@ class MakePermissionMigrationCommand extends Command
     {--name= : 文件分组名称}
     {--scopes= : 根据权限scopes过滤,正则格式,默认从配置文件读取}
     {--yaml : 生成yaml格式文件,需要php yaml扩展支持}
-    {--empty : 生成空文件,默认写入差异路由权限}
+    {--e|empty : 生成空文件,默认写入差异路由权限}
+    {--E|empty-modify : 写入所有权限，生成空修改}
     {--db : 从数据据库比对差异,默认从文件比对差异}';
 
     /**
@@ -60,7 +61,7 @@ class MakePermissionMigrationCommand extends Command
                 return;
             }
 
-            $path = base_path(config('permission.migration_path', 'database/permission'));
+            $path     = base_path(config('permission.migration_path', 'database/permission'));
             $filename = date('Y_m_d_His');
             if ($name) {
                 $filename .= '_' . $name;
@@ -72,12 +73,15 @@ class MakePermissionMigrationCommand extends Command
                 $this->error(sprintf('file %s exists.', $path));
                 return;
             }
+
             if ($this->option('empty')) {
                 $changes = [];
             } else {
                 $manager->loadMigrations();
-                $changes = $this->getChanges($manager->stores($name)[0]);
+                $store   = $manager->stores($name)[0];
+                $changes = $this->option('empty-modify') ? $this->getEmptyModify($store) : $this->getChanges($store);
             }
+
             call_user_func([$this, 'write' . ucfirst($type)], $path, $changes);
 
             $this->info($path);
@@ -85,6 +89,16 @@ class MakePermissionMigrationCommand extends Command
         } catch (PermissionException $exception) {
             $this->error($exception->getMessage());
         }
+    }
+
+    protected function getEmptyModify(LocalStore $store)
+    {
+        $original = $this->getOriginal($store);
+        $result   = [];
+        foreach ($original as $name => $item) {
+            $result['@' . $name]['type'] = $item['type'];
+        }
+        return $result;
     }
 
     protected function getChanges(LocalStore $store)
@@ -170,8 +184,8 @@ class MakePermissionMigrationCommand extends Command
     protected function parseRoutePermission($item)
     {
         $data = [
-            'type' => $item['type'],
-            'scopes' => [],
+            'type'    => $item['type'],
+            'scopes'  => [],
             'content' => ['url' => $item['path'], 'method' => $item['method']]
         ];
         if (!empty($item['rbac_ignore'])) {
@@ -215,7 +229,7 @@ class MakePermissionMigrationCommand extends Command
         if (empty($content)) {
             $content = "{\n}";
         } else {
-            $content = json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            $content = json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         }
         file_put_contents($path, $content);
     }

@@ -86,7 +86,7 @@ class MergePermissionMigrationCommand extends Command
 
     protected function writeJson($path, $content)
     {
-        file_put_contents($path, json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        file_put_contents($path, json_encode($content, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
     }
 
     protected function writeYaml($path, $content)
